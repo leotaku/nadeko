@@ -1,5 +1,4 @@
 /*
-**
 ** This file implements a template virtual-table.
 ** Developers can make a copy of this file as a baseline for writing
 ** new virtual tables and/or table-valued functions.
