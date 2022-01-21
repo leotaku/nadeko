@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <string.h>
 
+int sqlite3_nadeko_init(sqlite3 *, char **, const sqlite3_api_routines *);
+
 #define BUFFER_SIZE 1 << 16
 #define FLAG_SQLITE_TRACE \
     SQLITE_TRACE_STMT | SQLITE_TRACE_PROFILE | SQLITE_TRACE_ROW | SQLITE_TRACE_CLOSE
@@ -158,8 +160,6 @@ int parseCommandArgs(int argc, char *argv[]) {
 
     return SQLITE_OK;
 }
-
-int sqlite3_nadeko_init(sqlite3 *, char **, const sqlite3_api_routines *);
 
 int main(int argc, char *argv[]) {
     sqlite3 *db = NULL;
