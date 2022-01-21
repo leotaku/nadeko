@@ -9,8 +9,8 @@
 #define FLAG_SQLITE_OPEN \
     SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX
 
-void consume_whitespace_or_statement(char **point, int *line, int statement) {
-    int comment = 0;
+void consumeSingleStatement(char **point, int *line, int outside) {
+    int inLargeComment = 0;
     for (;;) {
         if (*point[0] == '\0') {
             break;
@@ -19,30 +19,30 @@ void consume_whitespace_or_statement(char **point, int *line, int statement) {
             *point += 1;
         } else if (*point[0] == ' ') {
             *point += 1;
-        } else if (comment) {
+        } else if (inLargeComment) {
             if (!strncmp(*point, "*/", 2)) {
-                comment = 0;
+                inLargeComment = 0;
                 *point += 2;
             } else {
                 *point += 1;
             }
         } else if (!strncmp(*point, "/*", 2)) {
-            comment = 1;
+            inLargeComment = 1;
             *point += 2;
         } else if (!strncmp(*point, "--", 2)) {
             *point = strchr(*point, '\n');
             if (!*point) *point = strchr(*point, '\0');
         } else if (*point[0] == ';') {
             *point += 1;
-            if (statement) break;
+            if (!outside) break;
         } else {
-            if (!statement) break;
+            if (outside) break;
             *point += 1;
         }
     }
 }
 
-int read_and_load_file(sqlite3 *db, const char *filename) {
+int readAndLoadFile(sqlite3 *db, const char *filename) {
     int rc = SQLITE_OK;
     char *err = sqlite3_malloc(0);
 
@@ -64,31 +64,31 @@ int read_and_load_file(sqlite3 *db, const char *filename) {
         goto abort;
     }
 
-    int end_line = 1;
+    int endLine = 1;
     char *end = buf;
     for (;;) {
         // Find start of SQL statement
         char *start = end;
-        int start_line = end_line;
-        consume_whitespace_or_statement(&start, &start_line, 0);
+        int startLine = endLine;
+        consumeSingleStatement(&start, &startLine, 1);
         if (start[0] == '\0') {
             break;
         };
 
         // Find end of SQL statement
         end = start;
-        end_line = start_line;
-        consume_whitespace_or_statement(&end, &end_line, 1);
+        endLine = startLine;
+        consumeSingleStatement(&end, &endLine, 0);
         if (end[0] == '\0') {
             rc = SQLITE_ERROR;
-            fprintf(stderr, "error: %s:%i: unterminated SQL\n", filename, start_line);
+            fprintf(stderr, "error: %s:%i: unterminated SQL\n", filename, startLine);
             break;
         };
 
         // Execute current SQL statement
         end[-1] = '\0';
         if ((rc = sqlite3_exec(db, start, NULL, NULL, &err) != SQLITE_OK)) {
-            fprintf(stderr, "error: %s:%i: %s\n", filename, start_line, err);
+            fprintf(stderr, "error: %s:%i: %s\n", filename, startLine, err);
             break;
         }
     }
@@ -99,11 +99,11 @@ abort:
     return rc;
 }
 
-void debug_log_callback(void *, int, const char *zMsg) {
+void debugLogCallback(void *, int, const char *zMsg) {
     fprintf(stderr, "debug: %s\n", zMsg);
 }
 
-int trace_log_callback(unsigned int type, void *, void *object, void *context) {
+int traceLogCallback(unsigned int type, void *, void *object, void *context) {
     char *string = NULL;
     switch (type) {
     case SQLITE_TRACE_STMT:
@@ -132,17 +132,17 @@ int trace_log_callback(unsigned int type, void *, void *object, void *context) {
     return SQLITE_OK;
 }
 
-int option_debug = 0;
-int option_trace = 0;
+int commandOptionDebug = 0;
+int commandOptionTrace = 0;
 
-int parse_command_args(int argc, char *argv[]) {
+int parseCommandArgs(int argc, char *argv[]) {
     int keep = 0;
     for (int n = 1; n < argc; n++) {
         argv[1 + keep] = argv[n];
         if (!strcmp(argv[n], "--debug")) {
-            option_debug = 1;
+            commandOptionDebug = 1;
         } else if (!strcmp(argv[n], "--trace")) {
-            option_trace = 1;
+            commandOptionTrace = 1;
         } else if (!strncmp(argv[n], "--", 2)) {
             fprintf(stderr, "error: unknown switch \"%s\"\n", argv[n]);
             return SQLITE_ERROR;
@@ -166,26 +166,26 @@ int main(int argc, char *argv[]) {
     char *err = NULL;
     int rc = SQLITE_OK;
 
-    if ((rc = parse_command_args(argc, argv)) == SQLITE_DONE) {
+    if ((rc = parseCommandArgs(argc, argv)) == SQLITE_DONE) {
         return SQLITE_OK;
     } else if (rc != SQLITE_OK) {
         return SQLITE_ERROR;
     }
 
-    if (option_debug &&
-        (rc = sqlite3_config(SQLITE_CONFIG_LOG, debug_log_callback, NULL))) {
+    if (commandOptionDebug &&
+        (rc = sqlite3_config(SQLITE_CONFIG_LOG, debugLogCallback, NULL))) {
         fprintf(stderr, "internal: setting debug: %s", sqlite3_errstr(rc));
     } else if ((rc = sqlite3_initialize())) {
         fprintf(stderr, "internal: initializing sqlite: %s", sqlite3_errstr(rc));
     } else if ((rc = sqlite3_open_v2(":memory:", &db, FLAG_SQLITE_OPEN, NULL))) {
         fprintf(stderr, "internal: opening in-memory database: %s", sqlite3_errstr(rc));
-    } else if (option_trace &&
-               (rc = sqlite3_trace_v2(db, FLAG_SQLITE_TRACE, trace_log_callback, NULL))) {
+    } else if (commandOptionTrace &&
+               (rc = sqlite3_trace_v2(db, FLAG_SQLITE_TRACE, traceLogCallback, NULL))) {
         fprintf(stderr, "internal: setting tracing: %s", sqlite3_errstr(rc));
     } else if ((rc = sqlite3_nadeko_init(db, &err, NULL))) {
         fprintf(stderr, "internal: initializing extension: %s", sqlite3_errmsg(db));
     } else {
-        rc = read_and_load_file(db, argv[1]);
+        rc = readAndLoadFile(db, argv[1]);
     }
 
     if (err) sqlite3_free(err);
