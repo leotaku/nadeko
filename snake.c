@@ -11,57 +11,57 @@ int sqlite3_nadeko_init(sqlite3 *, char **, const sqlite3_api_routines *);
     SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX
 #define READ_BUFFER_SIZE 1 << 16
 
-void consumeSingleStatement(char **point, int *line, int outside) {
+void consumeSingleStatement(char **ppiPoint, int *piLine, int bOutside) {
     int inLargeComment = 0;
     for (;;) {
-        if (*point[0] == '\0') {
+        if (*ppiPoint[0] == '\0') {
             break;
-        } else if (*point[0] == '\n') {
-            *line += 1;
-            *point += 1;
-        } else if (*point[0] == ' ') {
-            *point += 1;
+        } else if (*ppiPoint[0] == '\n') {
+            *piLine += 1;
+            *ppiPoint += 1;
+        } else if (*ppiPoint[0] == ' ') {
+            *ppiPoint += 1;
         } else if (inLargeComment) {
-            if (!strncmp(*point, "*/", 2)) {
+            if (!strncmp(*ppiPoint, "*/", 2)) {
                 inLargeComment = 0;
-                *point += 2;
+                *ppiPoint += 2;
             } else {
-                *point += 1;
+                *ppiPoint += 1;
             }
-        } else if (!strncmp(*point, "/*", 2)) {
+        } else if (!strncmp(*ppiPoint, "/*", 2)) {
             inLargeComment = 1;
-            *point += 2;
-        } else if (!strncmp(*point, "--", 2)) {
-            *point = strchr(*point, '\n');
-            if (!*point) *point = strchr(*point, '\0');
-        } else if (*point[0] == ';') {
-            *point += 1;
-            if (!outside) break;
+            *ppiPoint += 2;
+        } else if (!strncmp(*ppiPoint, "--", 2)) {
+            *ppiPoint = strchr(*ppiPoint, '\n');
+            if (!*ppiPoint) *ppiPoint = strchr(*ppiPoint, '\0');
+        } else if (*ppiPoint[0] == ';') {
+            *ppiPoint += 1;
+            if (!bOutside) break;
         } else {
-            if (outside) break;
-            *point += 1;
+            if (bOutside) break;
+            *ppiPoint += 1;
         }
     }
 }
 
-int readAndLoadFile(sqlite3 *db, const char *filename) {
+int readAndLoadFile(sqlite3 *db, const char *zFilename) {
     int rc = SQLITE_OK;
     char *err = sqlite3_malloc(0);
 
-    FILE *fd = fopen(filename, "r");
+    FILE *fd = fopen(zFilename, "r");
     if (fd == NULL) {
-        fprintf(stderr, "error: opening \"%s\": %s\n", filename, strerror(errno));
+        fprintf(stderr, "error: opening \"%s\": %s\n", zFilename, strerror(errno));
         rc = SQLITE_EMPTY;
         goto abort;
     }
 
     char buf[READ_BUFFER_SIZE];
     if (fread(buf, sizeof(*buf), READ_BUFFER_SIZE, fd) && ferror(fd)) {
-        fprintf(stderr, "error: reading \"%s\": %s\n", filename, strerror(errno));
+        fprintf(stderr, "error: reading \"%s\": %s\n", zFilename, strerror(errno));
         rc = errno;
         goto abort;
     } else if (!feof(fd)) {
-        fprintf(stderr, "error: reading \"%s\": %s\n", filename, "buffer too small");
+        fprintf(stderr, "error: reading \"%s\": %s\n", zFilename, "buffer too small");
         rc = errno;
         goto abort;
     }
@@ -83,14 +83,14 @@ int readAndLoadFile(sqlite3 *db, const char *filename) {
         consumeSingleStatement(&end, &endLine, 0);
         if (end[0] == '\0') {
             rc = SQLITE_ERROR;
-            fprintf(stderr, "error: %s:%i: unterminated SQL\n", filename, startLine);
+            fprintf(stderr, "error: %s:%i: unterminated SQL\n", zFilename, startLine);
             break;
         };
 
         // Execute current SQL statement
         end[-1] = '\0';
         if ((rc = sqlite3_exec(db, start, NULL, NULL, &err) != SQLITE_OK)) {
-            fprintf(stderr, "error: %s:%i: %s\n", filename, startLine, err);
+            fprintf(stderr, "error: %s:%i: %s\n", zFilename, startLine, err);
             break;
         }
     }
@@ -105,30 +105,30 @@ void debugLogCallback(void *, int, const char *zMsg) {
     fprintf(stderr, "debug: %s\n", zMsg);
 }
 
-int traceLogCallback(unsigned int type, void *, void *object, void *context) {
+int traceLogCallback(unsigned int uMask, void *, void *pData, void *pCtx) {
     char *string = NULL;
-    switch (type) {
+    switch (uMask) {
     case SQLITE_TRACE_STMT:
-        string = sqlite3_expanded_sql(object);
+        string = sqlite3_expanded_sql(pData);
         fprintf(stderr, "trace: prepare: \"%s\"\n", string);
         break;
     case SQLITE_TRACE_ROW:
-        string = sqlite3_expanded_sql(object);
+        string = sqlite3_expanded_sql(pData);
         if (!string) break;
         fprintf(stderr, "trace: row: \"%s\" resulted in ", string);
-        for (int n = 0; n < sqlite3_column_count(object); n++) {
+        for (int column = 0; column < sqlite3_column_count(pData); column++) {
             fprintf(stderr,
                 "%s%s",
-                n == 0 ? "" : ",",
-                sqlite3_column_type(object, n) == SQLITE_BLOB
+                column == 0 ? "" : ",",
+                sqlite3_column_type(pData, column) == SQLITE_BLOB
                     ? "BLOB"
-                    : (char *)(sqlite3_column_text(object, n)));
+                    : (char *)(sqlite3_column_text(pData, column)));
         }
         fputc('\n', stderr);
         break;
     case SQLITE_TRACE_PROFILE:
-        string = sqlite3_expanded_sql(object);
-        fprintf(stderr, "trace: profile: \"%s\" took %ins\n", string, *(int *)(context));
+        string = sqlite3_expanded_sql(pData);
+        fprintf(stderr, "trace: profile: \"%s\" took %ins\n", string, *(int *)(pCtx));
         break;
     case SQLITE_TRACE_CLOSE:
         fprintf(stderr, "trace: close database connection\n");
