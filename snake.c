@@ -5,11 +5,11 @@
 
 int sqlite3_nadeko_init(sqlite3 *, char **, const sqlite3_api_routines *);
 
-#define BUFFER_SIZE 1 << 16
 #define FLAG_SQLITE_TRACE \
     SQLITE_TRACE_STMT | SQLITE_TRACE_PROFILE | SQLITE_TRACE_ROW | SQLITE_TRACE_CLOSE
 #define FLAG_SQLITE_OPEN \
     SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX
+#define READ_BUFFER_SIZE 1 << 16
 
 void consumeSingleStatement(char **point, int *line, int outside) {
     int inLargeComment = 0;
@@ -55,8 +55,8 @@ int readAndLoadFile(sqlite3 *db, const char *filename) {
         goto abort;
     }
 
-    char buf[BUFFER_SIZE];
-    if (fread(buf, sizeof(*buf), BUFFER_SIZE, fd) && ferror(fd)) {
+    char buf[READ_BUFFER_SIZE];
+    if (fread(buf, sizeof(*buf), READ_BUFFER_SIZE, fd) && ferror(fd)) {
         fprintf(stderr, "error: reading \"%s\": %s\n", filename, strerror(errno));
         rc = errno;
         goto abort;
