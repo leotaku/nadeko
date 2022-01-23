@@ -117,7 +117,12 @@ int traceLogCallback(unsigned int type, void *, void *object, void *context) {
         if (!string) break;
         fprintf(stderr, "trace: row: \"%s\" resulted in ", string);
         for (int n = 0; n < sqlite3_column_count(object); n++) {
-            fprintf(stderr, "%s%s", n == 0 ? "" : ",", sqlite3_column_text(object, n));
+            fprintf(stderr,
+                "%s%s",
+                n == 0 ? "" : ",",
+                sqlite3_column_type(object, n) == SQLITE_BLOB
+                    ? "BLOB"
+                    : (char *)(sqlite3_column_text(object, n)));
         }
         fputc('\n', stderr);
         break;
