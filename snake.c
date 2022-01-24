@@ -1,9 +1,8 @@
 #include <errno.h>
+#include <nadeko.c>
 #include <sqlite3.h>
 #include <stdio.h>
 #include <string.h>
-
-int sqlite3_nadeko_init(sqlite3 *, char **, const sqlite3_api_routines *);
 
 #define FLAG_SQLITE_TRACE \
     SQLITE_TRACE_STMT | SQLITE_TRACE_PROFILE | SQLITE_TRACE_ROW | SQLITE_TRACE_CLOSE
