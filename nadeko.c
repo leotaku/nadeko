@@ -203,6 +203,17 @@ struct nadeko_cursor {
 };
 
 /*
+** This method is the destructor for nadeko_vtab objects.
+*/
+static int nadekoDisconnect(sqlite3_vtab *pVtab) {
+    nadeko_vtab *pNdk = (nadeko_vtab *)(pVtab);
+    sqlite3_free(pNdk->zDb);
+    sqlite3_free(pNdk->zTable);
+    sqlite3_free(pVtab);
+    return SQLITE_OK;
+}
+
+/*
 ** The nadekoConnect() method is invoked to create a new
 ** template virtual table.
 **
@@ -229,9 +240,7 @@ static int nadekoConnect(sqlite3 *db, void *, int argc, const char *const *argv,
     *ppVtab = (sqlite3_vtab *)pNew;
 
     if (argc != 4 || (zFilename = nadekoUnquote(argv[3])) == 0) {
-        sqlite3_free(pNew->zDb);
-        sqlite3_free(pNew->zTable);
-        sqlite3_free(pNew);
+        nadekoDisconnect(&pNew->base);
         return SQLITE_ERROR;
     }
     rc = nadekoReadFromFilename(zFilename, pNew->db, pNew->zDb, pNew->zTable);
@@ -241,17 +250,6 @@ static int nadekoConnect(sqlite3 *db, void *, int argc, const char *const *argv,
 #define NADEKO_FILENAME 0
 #define NADEKO_CONTENTS 1
     return rc || sqlite3_declare_vtab(db, "CREATE TABLE x(filename TEXT, contents BLOB)");
-}
-
-/*
-** This method is the destructor for nadeko_vtab objects.
-*/
-static int nadekoDisconnect(sqlite3_vtab *pVtab) {
-    nadeko_vtab *pNdk = (nadeko_vtab *)(pVtab);
-    sqlite3_free(pNdk->zDb);
-    sqlite3_free(pNdk->zTable);
-    sqlite3_free(pVtab);
-    return SQLITE_OK;
 }
 
 /*
