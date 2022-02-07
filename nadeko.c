@@ -59,6 +59,10 @@ static int nadekoIsDirectory(const char *zFilename) {
     return result;
 }
 
+/*
+** Return archive handle to the disk archive or directory
+** pointed at by the given filename.
+*/
 int nadekoOpenThing(struct archive **pa, const char *zFilename) {
     int rc = 0;
     if (nadekoIsDirectory(zFilename)) {
@@ -77,6 +81,9 @@ abort:
     return rc;
 }
 
+/*
+** Return string with first and last character removed.
+*/
 static char *nadekoUnquote(const char *zString) {
     int length = strlen(zString);
     if (length < 2) return 0;
@@ -110,6 +117,10 @@ static int nadekoExecPrintf(sqlite3 *db, char **pzErr, const char *zFormat, ...)
     return rc;
 }
 
+/*
+** Fill the BLOB pointed at by the given arguments with
+** data from the given archive.
+*/
 static int nadekoFillBlobFromArchive(struct archive *a, sqlite3 *db, const char *zDb,
     const char *zTable, const char *zColumn, int iRowid) {
     sqlite3_blob *blob;
