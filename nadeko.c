@@ -59,6 +59,24 @@ static int nadekoIsDirectory(const char *zFilename) {
     return result;
 }
 
+int nadekoOpenThing(struct archive **pa, const char *zFilename) {
+    int rc = 0;
+    if (nadekoIsDirectory(zFilename)) {
+        *pa = archive_read_disk_new();
+        if ((rc = archive_read_disk_open(*pa, zFilename))) goto abort;
+    } else {
+        *pa = archive_read_new();
+        archive_read_support_format_all(*pa);
+        archive_read_support_filter_all(*pa);
+        if ((rc = archive_read_open_filename(*pa, zFilename, 10240))) goto abort;
+    }
+    return 0;
+
+abort:
+    if (*pa) archive_read_close(*pa);
+    return rc;
+}
+
 static char *nadekoUnquote(const char *zString) {
     int length = strlen(zString);
     if (length < 2) return 0;
@@ -120,63 +138,6 @@ static int nadekoFillBlobFromArchive(struct archive *a, sqlite3 *db, const char 
     }
 }
 
-static int nadekoReadFromFilename(
-    const char *zFilename, sqlite3 *db, const char *zDb, const char *zTable) {
-    struct archive *a;
-    int isDisk;
-    sqlite3_stmt *pStmt = 0;
-    char *zErr = 0;
-    char *zSql = 0;
-    int rc;
-
-    if ((isDisk = nadekoIsDirectory(zFilename))) {
-        a = archive_read_disk_new();
-        if ((rc = archive_read_disk_open(a, zFilename))) goto abort;
-    } else {
-        a = archive_read_new();
-        archive_read_support_format_all(a);
-        archive_read_support_filter_all(a);
-        if ((rc = archive_read_open_filename(a, zFilename, 10240))) goto abort;
-    }
-
-    zSql = sqlite3_mprintf(
-        "INSERT OR REPLACE INTO %s.%s(filename, contents) VALUES(?, ?)", zDb, zTable);
-    if ((rc = sqlite3_prepare_v2(db, zSql, -1, &pStmt, 0))) goto abort;
-    if ((rc = nadekoExecPrintf(db, &zErr, "DELETE FROM %s.%s", zDb, zTable))) goto abort;
-
-    for (int iRowid = 1;; iRowid++) {
-        if (isDisk && archive_read_disk_can_descend(a)) archive_read_disk_descend(a);
-        struct archive_entry *entry;
-        switch ((rc = archive_read_next_header(a, &entry))) {
-        case ARCHIVE_EOF:
-            rc = SQLITE_OK;
-            goto abort;
-        case ARCHIVE_OK:
-            if (!archive_entry_size_is_set(entry)) {
-                rc = SQLITE_ERROR;
-                goto abort;
-            }
-            sqlite3_clear_bindings(pStmt);
-            sqlite3_reset(pStmt);
-            sqlite3_bind_text(
-                pStmt, 1, archive_entry_pathname(entry), -1, SQLITE_TRANSIENT);
-            sqlite3_bind_zeroblob(pStmt, 2, archive_entry_size(entry));
-            if ((rc = sqlite3_step(pStmt)) != SQLITE_DONE) goto abort;
-            if ((rc = nadekoFillBlobFromArchive(a, db, zDb, zTable, "contents", iRowid)))
-                goto abort;
-            break;
-        default:
-            goto abort;
-        }
-    }
-
-abort:
-    if (zSql) sqlite3_free(zSql);
-    if (pStmt) sqlite3_finalize(pStmt);
-    if (a) archive_read_free(a);
-    return rc;
-}
-
 /* nadeko_vtab is a subclass of sqlite3_vtab which is
 ** underlying representation of the virtual table
 */
@@ -185,6 +146,8 @@ struct nadeko_vtab {
     sqlite3_vtab base; /* Base class - must be first */
                        /* Insert new fields here */
     sqlite3 *db;
+    struct archive *pArchive;
+    sqlite3_int64 iKnown;
     char *zDb;
     char *zTable;
 };
@@ -198,8 +161,8 @@ struct nadeko_cursor {
     sqlite3_vtab_cursor base; /* Base class - must be first */
                               /* Insert new fields here */
     sqlite3_int64 iRowid;     /* The rowid */
-    sqlite3_stmt *pStmt;
-    int isEof;
+    struct archive_entry *pEntry;
+    nadeko_vtab *pParent;
 };
 
 /*
@@ -207,6 +170,7 @@ struct nadeko_cursor {
 */
 static int nadekoDisconnect(sqlite3_vtab *pVtab) {
     nadeko_vtab *pNdk = (nadeko_vtab *)(pVtab);
+    archive_read_free(pNdk->pArchive);
     sqlite3_free(pNdk->zDb);
     sqlite3_free(pNdk->zTable);
     sqlite3_free(pVtab);
@@ -243,7 +207,11 @@ static int nadekoConnect(sqlite3 *db, void *, int argc, const char *const *argv,
         nadekoDisconnect(&pNew->base);
         return SQLITE_ERROR;
     }
-    rc = nadekoReadFromFilename(zFilename, pNew->db, pNew->zDb, pNew->zTable);
+    if ((rc = nadekoOpenThing(&pNew->pArchive, zFilename))) {
+        nadekoDisconnect(&pNew->base);
+        sqlite3_free(zFilename);
+        return SQLITE_ERROR;
+    }
     sqlite3_free(zFilename);
 
     /* For convenience, define symbolic names for the index to each column. */
@@ -281,22 +249,13 @@ static int nadekoDestroy(sqlite3_vtab *pVtab) {
 ** Constructor for a new nadeko_cursor object.
 */
 static int nadekoOpen(sqlite3_vtab *pVtab, sqlite3_vtab_cursor **ppVtabCur) {
-    nadeko_vtab *pNdk = (nadeko_vtab *)(pVtab);
     nadeko_cursor *pCur;
     pCur = sqlite3_malloc(sizeof(*pCur));
     if (pCur == 0) return SQLITE_NOMEM;
     memset(pCur, 0, sizeof(*pCur));
-    {
-        char *zSql = sqlite3_mprintf(
-            "SELECT filename, contents FROM %s.%s", pNdk->zDb, pNdk->zTable);
-        int rc = sqlite3_prepare_v2(pNdk->db, zSql, -1, &pCur->pStmt, 0);
-        sqlite3_free(zSql);
-        if (rc) {
-            sqlite3_free(pCur);
-            return rc;
-        }
-    }
-    pCur->isEof = 0;
+    pCur->iRowid = 0;
+    pCur->pParent = (nadeko_vtab *)(pVtab);
+    pCur->pEntry = 0;
     *ppVtabCur = &pCur->base;
     return SQLITE_OK;
 }
@@ -306,7 +265,6 @@ static int nadekoOpen(sqlite3_vtab *pVtab, sqlite3_vtab_cursor **ppVtabCur) {
 */
 static int nadekoClose(sqlite3_vtab_cursor *pVtabCur) {
     nadeko_cursor *pCur = (nadeko_cursor *)pVtabCur;
-    sqlite3_finalize(pCur->pStmt);
     sqlite3_free(pCur);
     return SQLITE_OK;
 }
@@ -316,18 +274,40 @@ static int nadekoClose(sqlite3_vtab_cursor *pVtabCur) {
 */
 static int nadekoNext(sqlite3_vtab_cursor *pVtabCur) {
     nadeko_cursor *pCur = (nadeko_cursor *)pVtabCur;
-    int rc;
     pCur->iRowid++;
-
-    switch ((rc = sqlite3_step(pCur->pStmt))) {
-    case SQLITE_DONE:
-        pCur->isEof = 1;
-        return SQLITE_OK;
-    case SQLITE_ROW:
-        return SQLITE_OK;
-    default:
-        return rc;
+    if (pCur->iRowid <= pCur->pParent->iKnown || pCur->pParent->pArchive == 0) {
+        return ARCHIVE_OK;
     }
+
+    int rc = archive_read_next_header(pCur->pParent->pArchive, &pCur->pEntry);
+    if (rc == ARCHIVE_OK) {
+        sqlite3_stmt *pStmt;
+        char *zSql = sqlite3_mprintf(
+            "INSERT OR REPLACE INTO %s.%s (filename, contents) VALUES(?, ?)",
+            pCur->pParent->zDb,
+            pCur->pParent->zTable);
+        sqlite3_prepare_v2(pCur->pParent->db, zSql, -1, &pStmt, 0);
+        sqlite3_bind_text(
+            pStmt, 1, archive_entry_pathname(pCur->pEntry), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_zeroblob(pStmt, 2, archive_entry_size(pCur->pEntry));
+        sqlite3_step(pStmt);
+        sqlite3_finalize(pStmt);
+        sqlite3_free(zSql);
+        nadekoFillBlobFromArchive(pCur->pParent->pArchive,
+            pCur->pParent->db,
+            pCur->pParent->zDb,
+            pCur->pParent->zTable,
+            "contents",
+            pCur->iRowid);
+        pCur->pParent->iKnown++;
+    } else if (rc == ARCHIVE_EOF) {
+        archive_read_free(pCur->pParent->pArchive);
+        pCur->pParent->pArchive = 0;
+        pCur->pEntry = 0;
+        rc = ARCHIVE_OK;
+    }
+
+    return rc;
 }
 
 /*
@@ -339,21 +319,35 @@ static int nadekoColumn(sqlite3_vtab_cursor *pVtabCur, /* The cursor */
     int iColumn            /* Which column to return */
 ) {
     nadeko_cursor *pCur = (nadeko_cursor *)pVtabCur;
+    sqlite3_blob *pBlob;
+
     switch (iColumn) {
-    case NADEKO_FILENAME:
-        sqlite3_result_text(pCtx,
-            (char *)(sqlite3_column_text(pCur->pStmt, NADEKO_FILENAME)),
-            sqlite3_column_bytes(pCur->pStmt, NADEKO_FILENAME),
-            0);
-        break;
+    case NADEKO_FILENAME: {
+        char *zSql = sqlite3_mprintf("SELECT filename FROM %s.%s WHERE rowid == ?",
+            pCur->pParent->zDb,
+            pCur->pParent->zTable);
+        sqlite3_stmt *pStmt;
+        sqlite3_prepare(pCur->pParent->db, zSql, -1, &pStmt, 0);
+        sqlite3_bind_int(pStmt, 1, pCur->iRowid);
+        sqlite3_step(pStmt);
+        sqlite3_result_text(
+            pCtx, (const char *)(sqlite3_column_text(pStmt, 0)), -1, SQLITE_TRANSIENT);
+        sqlite3_finalize(pStmt);
+        sqlite3_free(zSql);
+    } break;
     default:
         assert(iColumn == NADEKO_CONTENTS);
-        sqlite3_result_blob(pCtx,
-            sqlite3_column_blob(pCur->pStmt, NADEKO_CONTENTS),
-            sqlite3_column_bytes(pCur->pStmt, NADEKO_CONTENTS),
-            0);
-        break;
+        sqlite3_blob_open(pCur->pParent->db,
+            pCur->pParent->zDb,
+            pCur->pParent->zTable,
+            "contents",
+            pCur->iRowid,
+            0,
+            &pBlob);
+        sqlite3_result_blob(pCtx, pBlob, sqlite3_blob_bytes(pBlob), 0);
+        sqlite3_blob_close(pBlob);
     }
+
     return SQLITE_OK;
 }
 
@@ -373,7 +367,7 @@ static int nadekoRowid(sqlite3_vtab_cursor *pVtabCur, sqlite_int64 *pRowid) {
 */
 static int nadekoEof(sqlite3_vtab_cursor *pVtabCur) {
     nadeko_cursor *pCur = (nadeko_cursor *)pVtabCur;
-    return pCur->isEof;
+    return pCur->iRowid > pCur->pParent->iKnown && pCur->pParent->pArchive == 0;
 }
 
 /*
@@ -384,10 +378,9 @@ static int nadekoEof(sqlite3_vtab_cursor *pVtabCur) {
 */
 static int nadekoFilter(
     sqlite3_vtab_cursor *pVtabCur, int, const char *, int, sqlite3_value **) {
+    int rc = 0;
     nadeko_cursor *pCur = (nadeko_cursor *)pVtabCur;
-    int rc = sqlite3_reset(pCur->pStmt);
-    pCur->iRowid = 1;
-    pCur->isEof = 0;
+    pCur->iRowid = 0;
 
     return rc || nadekoNext(pVtabCur);
 }
