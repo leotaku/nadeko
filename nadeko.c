@@ -88,6 +88,8 @@ abort:
 static char *nadekoUnquote(const char *zString) {
     int length = strlen(zString);
     if (length < 2) return 0;
+    if (zString[0] != '"' && zString[0] != '\'') return 0;
+    if (zString[0] != zString[length - 1]) return 0;
     char *result = sqlite3_malloc(sizeof(char) * length);
     if (result == 0) return 0;
     memset(result, 0, length);
