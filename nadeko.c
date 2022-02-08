@@ -63,7 +63,7 @@ static int nadekoIsDirectory(const char *zFilename) {
 ** Return archive handle to the disk archive or directory
 ** pointed at by the given filename.
 */
-int nadekoOpenThing(struct archive **pa, const char *zFilename) {
+static int nadekoOpenThing(struct archive **pa, const char *zFilename, char **pzErr) {
     int rc = 0;
     if (nadekoIsDirectory(zFilename)) {
         *pa = archive_read_disk_new();
