@@ -423,6 +423,12 @@ static int nadekoFilter(
 */
 static int nadekoBestIndex(sqlite3_vtab *, sqlite3_index_info *) { return SQLITE_OK; }
 
+/*
+** SQLite will invoke this method to determine whether a certain real table
+** is in fact a shadow table for a virtual table.  This routine needs
+** to return true when its input is the part of a shadow table name past
+** the last "_" character.
+*/
 static int nadekoShadowName(const char *pName) { return sqlite3_stricmp(pName, "store"); }
 
 /*
