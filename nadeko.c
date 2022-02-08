@@ -225,7 +225,7 @@ static int nadekoConnect(sqlite3 *db, void *, int argc, const char *const *argv,
     }
     if ((zFilename = nadekoUnquote(argv[3])) == 0) {
         nadekoDisconnect(&pNew->base);
-        *pzErr = sqlite3_mprintf("first argument to 'nadeko' was not a string");
+        *pzErr = sqlite3_mprintf("first argument to 'nadeko' not a string");
         return SQLITE_ERROR;
     }
     if ((rc = nadekoOpenThing(&pNew->pArchive, zFilename, pzErr))) {
