@@ -361,7 +361,7 @@ static int nadekoColumn(sqlite3_vtab_cursor *pVtabCur, /* The cursor */
     case NADEKO_FILENAME:
         sqlite3_result_text(pCtx,
             (const char *)(sqlite3_column_text(pCur->pSelect, 0)),
-            -1,
+            sqlite3_column_bytes(pCur->pSelect, 0),
             SQLITE_TRANSIENT);
         break;
     default:
