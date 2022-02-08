@@ -78,7 +78,7 @@ static int nadekoOpenThing(struct archive **pa, const char *zFilename, char **pz
 
 abort:
     *pzErr = sqlite3_mprintf("%s", archive_error_string(*pa));
-    if (*pa) archive_read_close(*pa);
+    archive_read_close(*pa);
     return rc;
 }
 
