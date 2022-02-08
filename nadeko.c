@@ -174,10 +174,10 @@ struct nadeko_cursor {
     sqlite3_vtab_cursor base; /* Base class - must be first */
                               /* Insert new fields here */
     sqlite3_int64 iRowid;     /* The rowid */
+    nadeko_vtab *pParent;     /* Parent vtab */
     struct archive_entry *pEntry;
     sqlite3_stmt *pSelect;
     sqlite3_stmt *pInsert;
-    nadeko_vtab *pParent;
 };
 
 /*
