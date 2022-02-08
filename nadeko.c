@@ -302,12 +302,12 @@ static int nadekoClose(sqlite3_vtab_cursor *pVtabCur) {
 */
 static int nadekoNext(sqlite3_vtab_cursor *pVtabCur) {
     nadeko_cursor *pCur = (nadeko_cursor *)pVtabCur;
-    int rc = ARCHIVE_OK;
+    int rc = SQLITE_OK;
     pCur->iRowid++;
 
     if (pCur->pParent->pArchive != 0 && pCur->iRowid > pCur->pParent->iKnown) {
-        rc = archive_read_next_header(pCur->pParent->pArchive, &pCur->pEntry);
-        if (rc == ARCHIVE_OK) {
+        switch (archive_read_next_header(pCur->pParent->pArchive, &pCur->pEntry)) {
+        case ARCHIVE_OK:
             sqlite3_bind_text(pCur->pInsert,
                 1,
                 archive_entry_pathname(pCur->pEntry),
@@ -323,12 +323,16 @@ static int nadekoNext(sqlite3_vtab_cursor *pVtabCur) {
                 "contents",
                 pCur->iRowid);
             pCur->pParent->iKnown++;
-        } else if (rc == ARCHIVE_EOF) {
+            break;
+        case ARCHIVE_EOF:
             archive_read_free(pCur->pParent->pArchive);
             pCur->pParent->pArchive = 0;
             pCur->pEntry = 0;
-            rc = ARCHIVE_OK;
-        }
+            break;
+        default:
+            rc = SQLITE_ERROR;
+            break;
+        };
     }
 
     sqlite3_reset(pCur->pSelect);
