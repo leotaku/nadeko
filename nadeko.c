@@ -218,7 +218,12 @@ static int nadekoConnect(sqlite3 *db, void *, int argc, const char *const *argv,
     pNew->zTable = sqlite3_mprintf("%s_store", argv[2]);
     *ppVtab = (sqlite3_vtab *)pNew;
 
-    if (argc != 4 || (zFilename = nadekoUnquote(argv[3])) == 0) {
+    if (argc != 4) {
+        nadekoDisconnect(&pNew->base);
+        *pzErr = sqlite3_mprintf("wrong number of arguments to 'nadeko'");
+        return SQLITE_ERROR;
+    }
+    if ((zFilename = nadekoUnquote(argv[3])) == 0) {
         nadekoDisconnect(&pNew->base);
         *pzErr = sqlite3_mprintf("first argument to 'nadeko' was not a string");
         return SQLITE_ERROR;
