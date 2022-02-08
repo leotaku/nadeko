@@ -285,7 +285,7 @@ static int nadekoOpen(sqlite3_vtab *pVtab, sqlite3_vtab_cursor **ppVtabCur) {
     sqlite3_free(zSel);
 
     char *zIns = sqlite3_mprintf("INSERT OR REPLACE INTO %s.%s (filename, contents)"
-                                 "VALUES(?, ?)",
+                                 "VALUES (?, ?)",
         pCur->pParent->zDb,
         pCur->pParent->zTable);
     sqlite3_prepare(pCur->pParent->db, zIns, -1, &pCur->pInsert, 0);
