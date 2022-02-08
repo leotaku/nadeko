@@ -138,14 +138,13 @@ static int nadekoFillBlobFromArchive(struct archive *a, sqlite3 *db, const char 
         } else if (read == 0) {
             sqlite3_blob_close(blob);
             return SQLITE_OK;
-            break;
         } else {
             if ((rc = sqlite3_blob_write(blob, buf, read, offset))) {
                 sqlite3_blob_close(blob);
                 return rc;
             }
             offset += read;
-        };
+        }
     }
 }
 
