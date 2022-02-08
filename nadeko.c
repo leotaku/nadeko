@@ -77,6 +77,7 @@ static int nadekoOpenThing(struct archive **pa, const char *zFilename, char **pz
     return 0;
 
 abort:
+    *pzErr = sqlite3_mprintf("%s", archive_error_string(*pa));
     if (*pa) archive_read_close(*pa);
     return rc;
 }
@@ -203,7 +204,7 @@ static int nadekoDisconnect(sqlite3_vtab *pVtab) {
 **        result set of queries against the virtual table will look like.
 */
 static int nadekoConnect(sqlite3 *db, void *, int argc, const char *const *argv,
-    sqlite3_vtab **ppVtab, char **) {
+    sqlite3_vtab **ppVtab, char **pzErr) {
     char *zFilename;
     int rc;
 
@@ -217,9 +218,10 @@ static int nadekoConnect(sqlite3 *db, void *, int argc, const char *const *argv,
 
     if (argc != 4 || (zFilename = nadekoUnquote(argv[3])) == 0) {
         nadekoDisconnect(&pNew->base);
+        *pzErr = sqlite3_mprintf("first argument to 'nadeko' was not a string");
         return SQLITE_ERROR;
     }
-    if ((rc = nadekoOpenThing(&pNew->pArchive, zFilename))) {
+    if ((rc = nadekoOpenThing(&pNew->pArchive, zFilename, pzErr))) {
         nadekoDisconnect(&pNew->base);
         sqlite3_free(zFilename);
         return SQLITE_ERROR;
@@ -330,6 +332,8 @@ static int nadekoNext(sqlite3_vtab_cursor *pVtabCur) {
             pCur->pEntry = 0;
             break;
         default:
+            pVtabCur->pVtab->zErrMsg =
+                sqlite3_mprintf("%s", archive_error_string(pCur->pParent->pArchive));
             rc = SQLITE_ERROR;
             break;
         };
