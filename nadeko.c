@@ -90,9 +90,9 @@ static char *nadekoUnquote(const char *zString) {
     if (length < 2) return 0;
     if (zString[0] != '"' && zString[0] != '\'') return 0;
     if (zString[0] != zString[length - 1]) return 0;
-    char *result = sqlite3_malloc(sizeof(char) * length);
+    char *result = sqlite3_malloc(sizeof(char) * (length - 1));
     if (result == 0) return 0;
-    memset(result, 0, length);
+    memset(result, 0, length - 1);
     memcpy(result, zString + 1, length - 2);
 
     return result;
