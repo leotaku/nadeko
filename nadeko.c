@@ -100,7 +100,7 @@ static char *nadekoUnquote(const char *zString) {
 
 /*
 ** Copied verbatim from fts5ExecPrintf() in fts5_storage.c.
-**/
+*/
 static int nadekoExecPrintf(sqlite3 *db, char **pzErr, const char *zFormat, ...) {
     int rc;
     va_list ap; /* ... printf arguments */
