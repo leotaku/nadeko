@@ -284,10 +284,11 @@ static int nadekoOpen(sqlite3_vtab *pVtab, sqlite3_vtab_cursor **ppVtabCur) {
     sqlite3_prepare(pCur->pParent->db, zSel, -1, &pCur->pSelect, 0);
     sqlite3_free(zSel);
 
-    char *zIns = sqlite3_mprintf("INSERT OR REPLACE INTO %s.%s (filename, contents)"
-                                 "VALUES (?, ?)",
-        pCur->pParent->zDb,
-        pCur->pParent->zTable);
+    char *zIns =
+        sqlite3_mprintf("INSERT OR REPLACE INTO %s.%s (rowid, filename, contents)"
+                        "VALUES (?, ?, ?)",
+            pCur->pParent->zDb,
+            pCur->pParent->zTable);
     sqlite3_prepare(pCur->pParent->db, zIns, -1, &pCur->pInsert, 0);
     sqlite3_free(zIns);
 
@@ -317,12 +318,13 @@ static int nadekoNext(sqlite3_vtab_cursor *pVtabCur) {
     if (pCur->pParent->pArchive != 0 && pCur->iRowid > pCur->pParent->iKnown) {
         switch (archive_read_next_header(pCur->pParent->pArchive, &pCur->pEntry)) {
         case ARCHIVE_OK:
+            sqlite3_bind_int(pCur->pInsert, 1, pCur->pParent->iKnown + 1);
             sqlite3_bind_text(pCur->pInsert,
-                1,
+                2,
                 archive_entry_pathname(pCur->pEntry),
                 -1,
                 SQLITE_TRANSIENT);
-            sqlite3_bind_zeroblob(pCur->pInsert, 2, archive_entry_size(pCur->pEntry));
+            sqlite3_bind_zeroblob(pCur->pInsert, 3, archive_entry_size(pCur->pEntry));
             sqlite3_step(pCur->pInsert);
             sqlite3_reset(pCur->pInsert);
             nadekoFillBlobFromArchive(pCur->pParent->pArchive,
