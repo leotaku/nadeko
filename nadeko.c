@@ -152,7 +152,7 @@ static int nadekoFillBlobFromArchive(struct archive *a, sqlite3 *db, const char 
 }
 
 /* nadeko_vtab is a subclass of sqlite3_vtab which is
-** underlying representation of the virtual table
+** the underlying representation of the virtual table
 */
 typedef struct nadeko_vtab nadeko_vtab;
 struct nadeko_vtab {
