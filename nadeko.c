@@ -410,7 +410,7 @@ static int nadekoEof(sqlite3_vtab_cursor *pVtabCur) {
 */
 static int nadekoFilter(
     sqlite3_vtab_cursor *pVtabCur, int, const char *, int, sqlite3_value **) {
-    int rc = 0;
+    int rc = SQLITE_OK;
     nadeko_cursor *pCur = (nadeko_cursor *)pVtabCur;
     pCur->iRowid = 0;
 
