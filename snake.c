@@ -46,7 +46,7 @@ void consumeSingleStatement(char **ppPoint, int *pLinum, int isOutside) {
 
 int readAndLoadFile(sqlite3 *db, const char *zFilename) {
     int rc = SQLITE_OK;
-    char *err = sqlite3_malloc(0);
+    char *err = 0;
 
     FILE *fd = fopen(zFilename, "r");
     if (fd == 0) {
