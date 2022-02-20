@@ -127,7 +127,8 @@ int traceLogCallback(unsigned int uMask, void *, void *pData, void *pCtx) {
         break;
     case SQLITE_TRACE_PROFILE:
         string = sqlite3_expanded_sql(pData);
-        fprintf(stderr, "trace: profile: \"%s\" took %ins\n", string, *(int *)(pCtx));
+        fprintf(
+            stderr, "trace: profile: statement took %fms\n", *(int *)(pCtx) / 1000000.0);
         break;
     case SQLITE_TRACE_CLOSE:
         fprintf(stderr, "trace: close database connection\n");
