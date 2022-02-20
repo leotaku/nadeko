@@ -46,7 +46,7 @@ void consumeSingleStatement(char **ppPoint, int *pLinum, int isOutside) {
 
 int readAndLoadFile(sqlite3 *db, const char *zFilename) {
     int rc = SQLITE_OK;
-    char *err = 0;
+    char *zErr = 0;
 
     FILE *fd = fopen(zFilename, "r");
     if (fd == 0) {
@@ -66,37 +66,37 @@ int readAndLoadFile(sqlite3 *db, const char *zFilename) {
         goto abort;
     }
 
-    int endLine = 1;
-    char *end = buf;
+    int iEndLinum = 1;
+    char *pEnd = buf;
     for (;;) {
         // Find start of SQL statement
-        char *start = end;
-        int startLine = endLine;
-        consumeSingleStatement(&start, &startLine, 1);
+        char *start = pEnd;
+        int iStartLinum = iEndLinum;
+        consumeSingleStatement(&start, &iStartLinum, 1);
         if (start[0] == '\0') {
             break;
         };
 
         // Find end of SQL statement
-        end = start;
-        endLine = startLine;
-        consumeSingleStatement(&end, &endLine, 0);
-        if (end[0] == '\0') {
+        pEnd = start;
+        iEndLinum = iStartLinum;
+        consumeSingleStatement(&pEnd, &iEndLinum, 0);
+        if (pEnd[0] == '\0') {
             rc = SQLITE_ERROR;
-            fprintf(stderr, "error: %s:%i: unterminated SQL\n", zFilename, startLine);
+            fprintf(stderr, "error: %s:%i: unterminated SQL\n", zFilename, iStartLinum);
             break;
         };
 
         // Execute current SQL statement
-        end[-1] = '\0';
-        if ((rc = sqlite3_exec(db, start, 0, 0, &err) != SQLITE_OK)) {
-            fprintf(stderr, "error: %s:%i: %s\n", zFilename, startLine, err);
+        pEnd[-1] = '\0';
+        if ((rc = sqlite3_exec(db, start, 0, 0, &zErr) != SQLITE_OK)) {
+            fprintf(stderr, "error: %s:%i: %s\n", zFilename, iStartLinum, zErr);
             break;
         }
     }
 
 abort:
-    sqlite3_free(err);
+    sqlite3_free(zErr);
     if (fd) fclose(fd);
     return rc;
 }
@@ -149,22 +149,22 @@ int commandOptionDebug = 0;
 int commandOptionTrace = 0;
 
 int parseCommandArgs(int argc, char *argv[]) {
-    int keep = 0;
+    int iPositional = 0;
     for (int n = 1; n < argc; n++) {
-        argv[1 + keep] = argv[n];
+        argv[1 + iPositional] = argv[n];
         if (!strcmp(argv[n], "--debug")) {
-            commandOptionDebug = 1;
+            isOptionDebug = 1;
         } else if (!strcmp(argv[n], "--trace")) {
-            commandOptionTrace = 1;
+            isOptionTrace = 1;
         } else if (!strncmp(argv[n], "--", 2)) {
             fprintf(stderr, "error: unknown switch \"%s\"\n", argv[n]);
             return SQLITE_ERROR;
         } else {
-            keep++;
+            iPositional++;
         }
     }
 
-    if (keep < 1) {
+    if (iPositional < 1) {
         fprintf(stderr, "error: missing positional argument\n");
         return SQLITE_ERROR;
     }
@@ -174,7 +174,7 @@ int parseCommandArgs(int argc, char *argv[]) {
 
 int main(int argc, char *argv[]) {
     sqlite3 *db = 0;
-    char *err = 0;
+    char *zErr = 0;
     int rc = SQLITE_OK;
 
     if ((rc = parseCommandArgs(argc, argv)) == SQLITE_DONE) {
@@ -193,15 +193,15 @@ int main(int argc, char *argv[]) {
     } else if (commandOptionTrace &&
                (rc = sqlite3_trace_v2(db, FLAG_SQLITE_TRACE, traceLogCallback, 0))) {
         fprintf(stderr, "internal: setting tracing: %s", sqlite3_errstr(rc));
-    } else if ((rc = sqlite3_nadeko_init(db, &err, 0))) {
+    } else if ((rc = sqlite3_nadeko_init(db, &zErr, 0))) {
         fprintf(stderr, "internal: initializing extension: %s", sqlite3_errmsg(db));
-    } else if ((rc = sqlite3_lines_init(db, &err, 0))) {
+    } else if ((rc = sqlite3_lines_init(db, &zErr, 0))) {
         fprintf(stderr, "internal: initializing extension: %s", sqlite3_errmsg(db));
     } else {
         rc = readAndLoadFile(db, argv[1]);
     }
 
-    if (err) sqlite3_free(err);
+    if (zErr) sqlite3_free(zErr);
     if (db) sqlite3_close(db);
     sqlite3_shutdown();
 
