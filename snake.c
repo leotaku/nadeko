@@ -106,15 +106,20 @@ void debugLogCallback(void *, int, const char *zMsg) {
 
 int traceLogCallback(unsigned int uMask, void *, void *pData, void *pCtx) {
     char *string = NULL;
+    char *newline;
     switch (uMask) {
     case SQLITE_TRACE_STMT:
         string = sqlite3_expanded_sql(pData);
-        fprintf(stderr, "trace: prepare: \"%s\"\n", string);
+        if ((newline = strchr(string, '\n'))) {
+            fprintf(stderr, "trace: prepare: %.*s...\n", (int)(newline - string), string);
+        } else {
+            fprintf(stderr, "trace: prepare: %s\n", string);
+        }
         break;
     case SQLITE_TRACE_ROW:
         string = sqlite3_expanded_sql(pData);
         if (!string) break;
-        fprintf(stderr, "trace: row: \"%s\" resulted in ", string);
+        fprintf(stderr, "trace: row: statement resulted in ");
         for (int column = 0; column < sqlite3_column_count(pData); column++) {
             fprintf(stderr,
                 "%s%s",
