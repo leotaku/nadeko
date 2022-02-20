@@ -145,8 +145,8 @@ int traceLogCallback(unsigned int uMask, void *, void *pData, void *pCtx) {
     return SQLITE_OK;
 }
 
-int commandOptionDebug = 0;
-int commandOptionTrace = 0;
+int isOptionDebug = 0;
+int isOptionTrace = 0;
 
 int parseCommandArgs(int argc, char *argv[]) {
     int iPositional = 0;
@@ -183,14 +183,13 @@ int main(int argc, char *argv[]) {
         return SQLITE_ERROR;
     }
 
-    if (commandOptionDebug &&
-        (rc = sqlite3_config(SQLITE_CONFIG_LOG, debugLogCallback, 0))) {
+    if (isOptionDebug && (rc = sqlite3_config(SQLITE_CONFIG_LOG, debugLogCallback, 0))) {
         fprintf(stderr, "internal: setting debug: %s", sqlite3_errstr(rc));
     } else if ((rc = sqlite3_initialize())) {
         fprintf(stderr, "internal: initializing sqlite: %s", sqlite3_errstr(rc));
     } else if ((rc = sqlite3_open_v2(":memory:", &db, FLAG_SQLITE_OPEN, 0))) {
         fprintf(stderr, "internal: opening in-memory database: %s", sqlite3_errstr(rc));
-    } else if (commandOptionTrace &&
+    } else if (isOptionTrace &&
                (rc = sqlite3_trace_v2(db, FLAG_SQLITE_TRACE, traceLogCallback, 0))) {
         fprintf(stderr, "internal: setting tracing: %s", sqlite3_errstr(rc));
     } else if ((rc = sqlite3_nadeko_init(db, &zErr, 0))) {
