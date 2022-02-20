@@ -49,7 +49,7 @@ int readAndLoadFile(sqlite3 *db, const char *zFilename) {
     char *err = sqlite3_malloc(0);
 
     FILE *fd = fopen(zFilename, "r");
-    if (fd == NULL) {
+    if (fd == 0) {
         fprintf(stderr, "error: opening \"%s\": %s\n", zFilename, strerror(errno));
         rc = SQLITE_EMPTY;
         goto abort;
@@ -89,7 +89,7 @@ int readAndLoadFile(sqlite3 *db, const char *zFilename) {
 
         // Execute current SQL statement
         end[-1] = '\0';
-        if ((rc = sqlite3_exec(db, start, NULL, NULL, &err) != SQLITE_OK)) {
+        if ((rc = sqlite3_exec(db, start, 0, 0, &err) != SQLITE_OK)) {
             fprintf(stderr, "error: %s:%i: %s\n", zFilename, startLine, err);
             break;
         }
@@ -106,7 +106,7 @@ void debugLogCallback(void *, int, const char *zMsg) {
 }
 
 int traceLogCallback(unsigned int uMask, void *, void *pData, void *pCtx) {
-    char *zSql = NULL;
+    char *zSql = 0;
     char *pNewline;
     switch (uMask) {
     case SQLITE_TRACE_STMT:
@@ -173,8 +173,8 @@ int parseCommandArgs(int argc, char *argv[]) {
 }
 
 int main(int argc, char *argv[]) {
-    sqlite3 *db = NULL;
-    char *err = NULL;
+    sqlite3 *db = 0;
+    char *err = 0;
     int rc = SQLITE_OK;
 
     if ((rc = parseCommandArgs(argc, argv)) == SQLITE_DONE) {
@@ -184,18 +184,18 @@ int main(int argc, char *argv[]) {
     }
 
     if (commandOptionDebug &&
-        (rc = sqlite3_config(SQLITE_CONFIG_LOG, debugLogCallback, NULL))) {
+        (rc = sqlite3_config(SQLITE_CONFIG_LOG, debugLogCallback, 0))) {
         fprintf(stderr, "internal: setting debug: %s", sqlite3_errstr(rc));
     } else if ((rc = sqlite3_initialize())) {
         fprintf(stderr, "internal: initializing sqlite: %s", sqlite3_errstr(rc));
-    } else if ((rc = sqlite3_open_v2(":memory:", &db, FLAG_SQLITE_OPEN, NULL))) {
+    } else if ((rc = sqlite3_open_v2(":memory:", &db, FLAG_SQLITE_OPEN, 0))) {
         fprintf(stderr, "internal: opening in-memory database: %s", sqlite3_errstr(rc));
     } else if (commandOptionTrace &&
-               (rc = sqlite3_trace_v2(db, FLAG_SQLITE_TRACE, traceLogCallback, NULL))) {
+               (rc = sqlite3_trace_v2(db, FLAG_SQLITE_TRACE, traceLogCallback, 0))) {
         fprintf(stderr, "internal: setting tracing: %s", sqlite3_errstr(rc));
-    } else if ((rc = sqlite3_nadeko_init(db, &err, NULL))) {
+    } else if ((rc = sqlite3_nadeko_init(db, &err, 0))) {
         fprintf(stderr, "internal: initializing extension: %s", sqlite3_errmsg(db));
-    } else if ((rc = sqlite3_lines_init(db, &err, NULL))) {
+    } else if ((rc = sqlite3_lines_init(db, &err, 0))) {
         fprintf(stderr, "internal: initializing extension: %s", sqlite3_errmsg(db));
     } else {
         rc = readAndLoadFile(db, argv[1]);
