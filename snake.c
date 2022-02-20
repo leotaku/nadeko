@@ -105,20 +105,20 @@ void debugLogCallback(void *, int, const char *zMsg) {
 }
 
 int traceLogCallback(unsigned int uMask, void *, void *pData, void *pCtx) {
-    char *string = NULL;
-    char *newline;
+    char *zSql = NULL;
+    char *pNewline;
     switch (uMask) {
     case SQLITE_TRACE_STMT:
-        string = sqlite3_expanded_sql(pData);
-        if ((newline = strchr(string, '\n'))) {
-            fprintf(stderr, "trace: prepare: %.*s...\n", (int)(newline - string), string);
+        zSql = sqlite3_expanded_sql(pData);
+        if ((pNewline = strchr(zSql, '\n'))) {
+            fprintf(stderr, "trace: prepare: %.*s...\n", (int)(pNewline - zSql), zSql);
         } else {
-            fprintf(stderr, "trace: prepare: %s\n", string);
+            fprintf(stderr, "trace: prepare: %s\n", zSql);
         }
         break;
     case SQLITE_TRACE_ROW:
-        string = sqlite3_expanded_sql(pData);
-        if (!string) break;
+        zSql = sqlite3_expanded_sql(pData);
+        if (!zSql) break;
         fprintf(stderr, "trace: row: statement resulted in ");
         for (int column = 0; column < sqlite3_column_count(pData); column++) {
             fprintf(stderr,
@@ -131,7 +131,7 @@ int traceLogCallback(unsigned int uMask, void *, void *pData, void *pCtx) {
         fputc('\n', stderr);
         break;
     case SQLITE_TRACE_PROFILE:
-        string = sqlite3_expanded_sql(pData);
+        zSql = sqlite3_expanded_sql(pData);
         fprintf(
             stderr, "trace: profile: statement took %fms\n", *(int *)(pCtx) / 1000000.0);
         break;
@@ -139,7 +139,7 @@ int traceLogCallback(unsigned int uMask, void *, void *pData, void *pCtx) {
         fprintf(stderr, "trace: close database connection\n");
         break;
     }
-    if (string) sqlite3_free(string);
+    if (zSql) sqlite3_free(zSql);
 
     return SQLITE_OK;
 }
