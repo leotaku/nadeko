@@ -10,35 +10,35 @@
     SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX
 #define READ_BUFFER_SIZE 1 << 16
 
-void consumeSingleStatement(char **ppiPoint, int *piLine, int bOutside) {
-    int inLargeComment = 0;
+void consumeSingleStatement(char **ppPoint, int *pLinum, int isOutside) {
+    int isInLargeComment = 0;
     for (;;) {
-        if (*ppiPoint[0] == '\0') {
+        if (*ppPoint[0] == '\0') {
             break;
-        } else if (*ppiPoint[0] == '\n') {
-            *piLine += 1;
-            *ppiPoint += 1;
-        } else if (*ppiPoint[0] == ' ') {
-            *ppiPoint += 1;
-        } else if (inLargeComment) {
-            if (!strncmp(*ppiPoint, "*/", 2)) {
-                inLargeComment = 0;
-                *ppiPoint += 2;
+        } else if (*ppPoint[0] == '\n') {
+            *pLinum += 1;
+            *ppPoint += 1;
+        } else if (*ppPoint[0] == ' ') {
+            *ppPoint += 1;
+        } else if (isInLargeComment) {
+            if (!strncmp(*ppPoint, "*/", 2)) {
+                isInLargeComment = 0;
+                *ppPoint += 2;
             } else {
-                *ppiPoint += 1;
+                *ppPoint += 1;
             }
-        } else if (!strncmp(*ppiPoint, "/*", 2)) {
-            inLargeComment = 1;
-            *ppiPoint += 2;
-        } else if (!strncmp(*ppiPoint, "--", 2)) {
-            *ppiPoint = strchr(*ppiPoint, '\n');
-            if (!*ppiPoint) *ppiPoint = strchr(*ppiPoint, '\0');
-        } else if (*ppiPoint[0] == ';') {
-            *ppiPoint += 1;
-            if (!bOutside) break;
+        } else if (!strncmp(*ppPoint, "/*", 2)) {
+            isInLargeComment = 1;
+            *ppPoint += 2;
+        } else if (!strncmp(*ppPoint, "--", 2)) {
+            *ppPoint = strchr(*ppPoint, '\n');
+            if (!*ppPoint) *ppPoint = strchr(*ppPoint, '\0');
+        } else if (*ppPoint[0] == ';') {
+            *ppPoint += 1;
+            if (!isOutside) break;
         } else {
-            if (bOutside) break;
-            *ppiPoint += 1;
+            if (isOutside) break;
+            *ppPoint += 1;
         }
     }
 }
