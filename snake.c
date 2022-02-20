@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <lines.c>
 #include <nadeko.c>
 #include <sqlite3.h>
 #include <stdio.h>
@@ -193,6 +194,8 @@ int main(int argc, char *argv[]) {
                (rc = sqlite3_trace_v2(db, FLAG_SQLITE_TRACE, traceLogCallback, NULL))) {
         fprintf(stderr, "internal: setting tracing: %s", sqlite3_errstr(rc));
     } else if ((rc = sqlite3_nadeko_init(db, &err, NULL))) {
+        fprintf(stderr, "internal: initializing extension: %s", sqlite3_errmsg(db));
+    } else if ((rc = sqlite3_lines_init(db, &err, NULL))) {
         fprintf(stderr, "internal: initializing extension: %s", sqlite3_errmsg(db));
     } else {
         rc = readAndLoadFile(db, argv[1]);
