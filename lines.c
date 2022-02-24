@@ -59,7 +59,7 @@ struct lines_cursor {
     sqlite3_int64 iRowid;     /* The rowid */
     sqlite3_value *pValue;
     sqlite3_int64 iBytes;
-    sqlite3_int64 iOffset;
+    sqlite3_int64 iLength;
     char *pBuffer;
 };
 
@@ -116,6 +116,7 @@ static int linesOpen(sqlite3_vtab *, sqlite3_vtab_cursor **ppVtabCur) {
 */
 static int linesClose(sqlite3_vtab_cursor *pVtabCur) {
     lines_cursor *pCur = (lines_cursor *)pVtabCur;
+    sqlite3_free(pCur->pBuffer);
     sqlite3_free(pCur);
     return SQLITE_OK;
 }
@@ -125,22 +126,19 @@ static int linesClose(sqlite3_vtab_cursor *pVtabCur) {
 */
 static int linesNext(sqlite3_vtab_cursor *pVtabCur) {
     lines_cursor *pCur = (lines_cursor *)pVtabCur;
-    char *text = (char *)(sqlite3_value_text(pCur->pValue));
-    char *ptr = strchr(text + pCur->iOffset, '\n');
-    if (!ptr) ptr = text + pCur->iBytes;
-    sqlite3_int64 length = ptr - (text + pCur->iOffset);
+    memmove(pCur->pBuffer, pCur->pBuffer + pCur->iLength, pCur->iBytes - pCur->iLength);
+    memset(pCur->pBuffer + pCur->iBytes - pCur->iLength, 0, 1);
+    char *ptr = strchr(pCur->pBuffer, '\n');
+    if (!ptr) ptr = strchr(pCur->pBuffer, '\0');
+    pCur->iLength = ptr - pCur->pBuffer;
 
-    if (length >= 0) {
-        sqlite3_free(pCur->pBuffer);
-        pCur->pBuffer = sqlite3_malloc64((length + 1) * sizeof(char));
-        memset(pCur->pBuffer, 0, length + 1);
-        memcpy(pCur->pBuffer, text + pCur->iOffset, length);
-    } else {
+    if (pCur->iLength <= 0) {
         sqlite3_free(pCur->pBuffer);
         pCur->pBuffer = 0;
+    } else {
+        pCur->iLength++;
     };
 
-    pCur->iOffset += length + 1;
     pCur->iRowid++;
     return SQLITE_OK;
 }
@@ -156,7 +154,11 @@ static int linesColumn(sqlite3_vtab_cursor *pVtabCur, /* The cursor */
     lines_cursor *pCur = (lines_cursor *)pVtabCur;
     switch (i) {
     case LINES_LINE:
-        sqlite3_result_text(ctx, pCur->pBuffer, -1, SQLITE_TRANSIENT);
+        if (pCur->pBuffer[pCur->iLength - 2] == '\r') {
+            sqlite3_result_text(ctx, pCur->pBuffer, pCur->iLength - 2, SQLITE_TRANSIENT);
+        } else {
+            sqlite3_result_text(ctx, pCur->pBuffer, pCur->iLength - 1, SQLITE_TRANSIENT);
+        }
         break;
     default:
         assert(i == LINES_DATA);
@@ -199,8 +201,15 @@ static int linesFilter(
     switch (sqlite3_value_type(argv[0])) {
     case SQLITE_TEXT:
         pCur->pValue = argv[0];
-        pCur->iBytes = sqlite3_value_bytes(argv[0]);
-        pCur->iOffset = 0;
+        pCur->iLength = 0;
+        int iBytes = sqlite3_value_bytes(argv[0]) + 1;
+        if (pCur->iBytes != iBytes) {
+            sqlite3_free(pCur->pBuffer);
+            pCur->pBuffer = sqlite3_malloc(iBytes * sizeof(char));
+            pCur->iBytes = iBytes;
+        }
+        memset(pCur->pBuffer, 0, pCur->iBytes);
+        memcpy(pCur->pBuffer, sqlite3_value_text(argv[0]), pCur->iBytes - 1);
         break;
     case SQLITE_BLOB:
         pVtabCur->pVtab->zErrMsg =
