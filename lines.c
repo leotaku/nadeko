@@ -128,7 +128,7 @@ static int linesClose(sqlite3_vtab_cursor *pVtabCur) {
 static int linesNext(sqlite3_vtab_cursor *pVtabCur) {
     lines_cursor *pCur = (lines_cursor *)pVtabCur;
     pCur->iOffset += pCur->iLength;
-    if (pCur->iLength != 0) pCur->iOffset++;
+    if (pCur->iOffset != 0) pCur->iOffset++;
     if (pCur->pBuffer[pCur->iOffset] == '\r') pCur->iOffset++;
     if (pCur->iOffset >= pCur->iBytes) return SQLITE_OK;
 
