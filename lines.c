@@ -149,18 +149,18 @@ static int linesNext(sqlite3_vtab_cursor *pVtabCur) {
 ** is currently pointing.
 */
 static int linesColumn(sqlite3_vtab_cursor *pVtabCur, /* The cursor */
-    sqlite3_context *ctx, /* First argument to sqlite3_result_...() */
-    int i                 /* Which column to return */
+    sqlite3_context *pCtx, /* First argument to sqlite3_result_...() */
+    int iColumn            /* Which column to return */
 ) {
     lines_cursor *pCur = (lines_cursor *)pVtabCur;
-    switch (i) {
+    switch (iColumn) {
     case LINES_LINE:
         sqlite3_result_text(
-            ctx, pCur->pBuffer + pCur->iOffset, pCur->iLength, SQLITE_TRANSIENT);
+            pCtx, pCur->pBuffer + pCur->iOffset, pCur->iLength, SQLITE_TRANSIENT);
         break;
     default:
-        assert(i == LINES_DATA);
-        sqlite3_result_value(ctx, pCur->pValue);
+        assert(iColumn == LINES_DATA);
+        sqlite3_result_value(pCtx, pCur->pValue);
         break;
     }
     return SQLITE_OK;
