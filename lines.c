@@ -196,7 +196,7 @@ static int linesFilter(
     lines_cursor *pCur = (lines_cursor *)pVtabCur;
     int rc = SQLITE_OK;
 
-    sqlite_int64 iOldBytes = pCur->iBytes;
+    const sqlite_int64 iOldBytes = pCur->iBytes;
     pCur->pValue = argv[0];
     pCur->iBytes = sqlite3_value_bytes(argv[0]);
     pCur->iLength = 0;
