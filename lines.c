@@ -96,8 +96,8 @@ static int linesConnect(
 ** This method is the destructor for lines_vtab objects.
 */
 static int linesDisconnect(sqlite3_vtab *pVtab) {
-    lines_vtab *p = (lines_vtab *)pVtab;
-    sqlite3_free(p);
+    lines_vtab *pLns = (lines_vtab *)pVtab;
+    sqlite3_free(pLns);
     return SQLITE_OK;
 }
 
