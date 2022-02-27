@@ -196,16 +196,18 @@ static int linesFilter(
     lines_cursor *pCur = (lines_cursor *)pVtabCur;
     int rc = SQLITE_OK;
 
+    sqlite_int64 iOldBytes = pCur->iBytes;
     pCur->pValue = argv[0];
     pCur->iBytes = sqlite3_value_bytes(argv[0]);
     pCur->iLength = 0;
     pCur->iOffset = 0;
     switch (sqlite3_value_type(argv[0])) {
     case SQLITE_TEXT:
-        if (pCur->pBuffer == 0) {
+        if (pCur->iBytes != iOldBytes) {
+            sqlite3_free(pCur->pBuffer);
             pCur->pBuffer = sqlite3_malloc(pCur->iBytes * sizeof(char));
-            memcpy(pCur->pBuffer, sqlite3_value_text(argv[0]), pCur->iBytes);
         }
+        memcpy(pCur->pBuffer, sqlite3_value_text(argv[0]), pCur->iBytes);
         break;
     case SQLITE_BLOB:
         pVtabCur->pVtab->zErrMsg =
