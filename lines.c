@@ -203,7 +203,7 @@ static int linesFilter(
     pCur->iOffset = 0;
     switch (sqlite3_value_type(argv[0])) {
     case SQLITE_TEXT:
-        if (pCur->iBytes != iOldBytes) {
+        if (pCur->iBytes > iOldBytes) {
             sqlite3_free(pCur->pBuffer);
             pCur->pBuffer = sqlite3_malloc(pCur->iBytes * sizeof(char));
         }
