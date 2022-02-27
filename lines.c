@@ -210,9 +210,12 @@ static int linesFilter(
         memcpy(pCur->pBuffer, sqlite3_value_text(argv[0]), pCur->iBytes);
         break;
     case SQLITE_BLOB:
-        pVtabCur->pVtab->zErrMsg =
-            sqlite3_mprintf("blob support for lines() not yet implemented");
-        return SQLITE_ERROR;
+        if (pCur->iBytes > iOldBytes) {
+            sqlite3_free(pCur->pBuffer);
+            pCur->pBuffer = sqlite3_malloc(pCur->iBytes * sizeof(char));
+        }
+        memcpy(pCur->pBuffer, sqlite3_value_blob(argv[0]), pCur->iBytes);
+        break;
     default:
         pVtabCur->pVtab->zErrMsg =
             sqlite3_mprintf("first argument to lines() not a string or blob");
