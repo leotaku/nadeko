@@ -54,10 +54,12 @@ int readAndLoadFile(sqlite3 *db, const char *zFilename) {
     char buf[READ_BUFFER_SIZE];
     if (fread(buf, sizeof(*buf), READ_BUFFER_SIZE, fd) && ferror(fd)) {
         fprintf(stderr, "error: reading \"%s\": %s\n", zFilename, strerror(errno));
-        return fclose(fd) || errno;
+        fclose(fd);
+        return errno;
     } else if (!feof(fd)) {
         fprintf(stderr, "error: reading \"%s\": %s\n", zFilename, "buffer too small");
-        return fclose(fd) || errno;
+        fclose(fd);
+        return errno;
     }
 
     int iEndLinum = 1;
@@ -68,7 +70,8 @@ int readAndLoadFile(sqlite3 *db, const char *zFilename) {
         int iStartLinum = iEndLinum;
         consumeSingleStatement(&pStart, &iStartLinum, 1);
         if (pStart[0] == '\0') {
-            return fclose(fd) || SQLITE_OK;
+            fclose(fd);
+            return SQLITE_OK;
         };
 
         // Find end of SQL statement
@@ -77,7 +80,8 @@ int readAndLoadFile(sqlite3 *db, const char *zFilename) {
         consumeSingleStatement(&pEnd, &iEndLinum, 0);
         if (pEnd[0] == '\0') {
             fprintf(stderr, "error: %s:%i: unterminated SQL\n", zFilename, iStartLinum);
-            return fclose(fd) || SQLITE_ERROR;
+            fclose(fd);
+            return SQLITE_ERROR;
         };
 
         // Execute current SQL statement
@@ -86,7 +90,8 @@ int readAndLoadFile(sqlite3 *db, const char *zFilename) {
         if (sqlite3_exec(db, pStart, 0, 0, &zErr) != SQLITE_OK) {
             fprintf(stderr, "error: %s:%i: %s\n", zFilename, iStartLinum, zErr);
             sqlite3_free(zErr);
-            return fclose(fd) || SQLITE_ERROR;
+            fclose(fd);
+            return SQLITE_ERROR;
         }
     }
 }
