@@ -45,25 +45,19 @@ void consumeSingleStatement(char **ppPoint, int *pLinum, int isOutside) {
 }
 
 int readAndLoadFile(sqlite3 *db, const char *zFilename) {
-    int rc = SQLITE_OK;
-    char *zErr = 0;
-
     FILE *fd = fopen(zFilename, "r");
     if (fd == 0) {
         fprintf(stderr, "error: opening \"%s\": %s\n", zFilename, strerror(errno));
-        rc = SQLITE_EMPTY;
-        goto abort;
+        return errno;
     }
 
     char buf[READ_BUFFER_SIZE];
     if (fread(buf, sizeof(*buf), READ_BUFFER_SIZE, fd) && ferror(fd)) {
         fprintf(stderr, "error: reading \"%s\": %s\n", zFilename, strerror(errno));
-        rc = errno;
-        goto abort;
+        return fclose(fd) || errno;
     } else if (!feof(fd)) {
         fprintf(stderr, "error: reading \"%s\": %s\n", zFilename, "buffer too small");
-        rc = errno;
-        goto abort;
+        return fclose(fd) || errno;
     }
 
     int iEndLinum = 1;
@@ -74,7 +68,7 @@ int readAndLoadFile(sqlite3 *db, const char *zFilename) {
         int iStartLinum = iEndLinum;
         consumeSingleStatement(&pStart, &iStartLinum, 1);
         if (pStart[0] == '\0') {
-            break;
+            return fclose(fd) || SQLITE_OK;
         };
 
         // Find end of SQL statement
@@ -82,23 +76,19 @@ int readAndLoadFile(sqlite3 *db, const char *zFilename) {
         iEndLinum = iStartLinum;
         consumeSingleStatement(&pEnd, &iEndLinum, 0);
         if (pEnd[0] == '\0') {
-            rc = SQLITE_ERROR;
             fprintf(stderr, "error: %s:%i: unterminated SQL\n", zFilename, iStartLinum);
-            break;
+            return fclose(fd) || SQLITE_ERROR;
         };
 
         // Execute current SQL statement
+        char *zErr = 0;
         pEnd[-1] = '\0';
-        if ((rc = sqlite3_exec(db, start, 0, 0, &zErr) != SQLITE_OK)) {
+        if (sqlite3_exec(db, pStart, 0, 0, &zErr) != SQLITE_OK) {
             fprintf(stderr, "error: %s:%i: %s\n", zFilename, iStartLinum, zErr);
-            break;
+            sqlite3_free(zErr);
+            return fclose(fd) || SQLITE_ERROR;
         }
     }
-
-abort:
-    sqlite3_free(zErr);
-    if (fd) fclose(fd);
-    return rc;
 }
 
 void debugLogCallback(void *, int, const char *zMsg) {
