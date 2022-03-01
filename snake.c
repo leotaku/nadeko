@@ -70,15 +70,15 @@ int readAndLoadFile(sqlite3 *db, const char *zFilename) {
     char *pEnd = buf;
     for (;;) {
         // Find start of SQL statement
-        char *start = pEnd;
+        char *pStart = pEnd;
         int iStartLinum = iEndLinum;
-        consumeSingleStatement(&start, &iStartLinum, 1);
-        if (start[0] == '\0') {
+        consumeSingleStatement(&pStart, &iStartLinum, 1);
+        if (pStart[0] == '\0') {
             break;
         };
 
         // Find end of SQL statement
-        pEnd = start;
+        pEnd = pStart;
         iEndLinum = iStartLinum;
         consumeSingleStatement(&pEnd, &iEndLinum, 0);
         if (pEnd[0] == '\0') {
