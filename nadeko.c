@@ -34,6 +34,7 @@
 */
 #include <assert.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <string.h>
 #ifndef SQLITEINT_H
 #include <sqlite3ext.h>
@@ -41,6 +42,8 @@
 SQLITE_EXTENSION_INIT1
 #include <archive.h>
 #include <archive_entry.h>
+
+#define NADEKO_BUFFER_SIZE (1 << 16)
 
 /*
 ** Test if the given filename points at a directory using
@@ -127,14 +130,13 @@ static int nadekoExecPrintf(sqlite3 *db, char **pzErr, const char *zFormat, ...)
 static int nadekoFillBlobFromArchive(struct archive *a, sqlite3 *db, const char *zDb,
     const char *zTable, const char *zColumn, int iRowid) {
     sqlite3_blob *blob;
-    size_t size = 1 << 16;
     int offset = 0;
     int rc;
 
     if ((rc = sqlite3_blob_open(db, zDb, zTable, zColumn, iRowid, 1, &blob))) return rc;
     for (;;) {
-        char buf[size];
-        int read = archive_read_data(a, buf, size);
+        char buf[NADEKO_BUFFER_SIZE];
+        int read = archive_read_data(a, buf, NADEKO_BUFFER_SIZE);
         if (read == -1) {
             sqlite3_blob_close(blob);
             return SQLITE_ERROR;
@@ -151,6 +153,26 @@ static int nadekoFillBlobFromArchive(struct archive *a, sqlite3 *db, const char 
     }
 }
 
+static int nadekoFillArchiveFromBlob(struct archive *a, sqlite3_blob *pBlob) {
+    char buf[NADEKO_BUFFER_SIZE];
+    int bytes = sqlite3_blob_bytes(pBlob);
+    for (int offset = 0; offset < bytes; offset += NADEKO_BUFFER_SIZE) {
+        int write =
+            offset + NADEKO_BUFFER_SIZE < bytes ? NADEKO_BUFFER_SIZE : bytes - offset;
+        if (sqlite3_blob_read(pBlob, buf, write, offset)) {
+            sqlite3_blob_close(pBlob);
+            return SQLITE_ERROR;
+        }
+        if (archive_write_data(a, buf, write) == -1) {
+            sqlite3_blob_close(pBlob);
+            return SQLITE_ERROR;
+        }
+    }
+
+    sqlite3_blob_close(pBlob);
+    return SQLITE_OK;
+}
+
 /* nadeko_vtab is a subclass of sqlite3_vtab which is
 ** the underlying representation of the virtual table
 */
@@ -161,6 +183,9 @@ struct nadeko_vtab {
     sqlite3 *db;
     struct archive *pArchive;
     sqlite3_int64 iKnown;
+    sqlite3_int64 iBegun;
+    char *zFilename;
+    char *zTempname;
     char *zDb;
     char *zTable;
 };
@@ -178,6 +203,7 @@ struct nadeko_cursor {
     struct archive_entry *pEntry;
     sqlite3_stmt *pSelect;
     sqlite3_stmt *pInsert;
+    sqlite3_stmt *pDelete;
 };
 
 /*
@@ -186,6 +212,8 @@ struct nadeko_cursor {
 static int nadekoDisconnect(sqlite3_vtab *pVtab) {
     nadeko_vtab *pNdk = (nadeko_vtab *)(pVtab);
     archive_read_free(pNdk->pArchive);
+    sqlite3_free(pNdk->zFilename);
+    sqlite3_free(pNdk->zTempname);
     sqlite3_free(pNdk->zDb);
     sqlite3_free(pNdk->zTable);
     sqlite3_free(pVtab);
@@ -207,7 +235,6 @@ static int nadekoDisconnect(sqlite3_vtab *pVtab) {
 */
 static int nadekoConnect(sqlite3 *db, void *, int argc, const char *const *argv,
     sqlite3_vtab **ppVtab, char **pzErr) {
-    char *zFilename;
     int rc;
 
     nadeko_vtab *pNew = sqlite3_malloc(sizeof(*pNew));
@@ -220,20 +247,21 @@ static int nadekoConnect(sqlite3 *db, void *, int argc, const char *const *argv,
 
     if (argc != 4) {
         nadekoDisconnect(&pNew->base);
-        *pzErr = sqlite3_mprintf("wrong number of arguments to 'nadeko'");
+        *pzErr = sqlite3_mprintf("wrong number of arguments to nadeko()");
         return SQLITE_ERROR;
     }
-    if ((zFilename = nadekoUnquote(argv[3])) == 0) {
+    if ((pNew->zFilename = nadekoUnquote(argv[3])) == 0) {
         nadekoDisconnect(&pNew->base);
-        *pzErr = sqlite3_mprintf("first argument to 'nadeko' not a string");
+        *pzErr = sqlite3_mprintf("first argument to nadeko() not a string");
         return SQLITE_ERROR;
     }
-    if ((rc = nadekoOpenThing(&pNew->pArchive, zFilename, pzErr))) {
+    if (!(pNew->zTempname = tmpnam(sqlite3_malloc(L_tmpnam * sizeof(char))))) {
+        return SQLITE_NOMEM;
+    }
+    if ((rc = nadekoOpenThing(&pNew->pArchive, pNew->zFilename, pzErr))) {
         nadekoDisconnect(&pNew->base);
-        sqlite3_free(zFilename);
         return SQLITE_ERROR;
     }
-    sqlite3_free(zFilename);
 
     /* For convenience, define symbolic names for the index to each column. */
 #define NADEKO_FILENAME 0
@@ -249,7 +277,10 @@ static int nadekoCreate(sqlite3 *db, void *pAux, int argc, const char *const *ar
     sqlite3_vtab **ppVtab, char **pzErr) {
     int rc = nadekoExecPrintf(db,
         pzErr,
-        "CREATE TABLE IF NOT EXISTS %s.%s_store (filename TEXT, contents BLOB)",
+        "CREATE TABLE IF NOT EXISTS %s.%s_store ("
+        "  filename TEXT PRIMARY KEY,"
+        "  contents BLOB,"
+        ")",
         argv[1],
         argv[2]);
 
@@ -292,6 +323,11 @@ static int nadekoOpen(sqlite3_vtab *pVtab, sqlite3_vtab_cursor **ppVtabCur) {
     sqlite3_prepare(pCur->pParent->db, zIns, -1, &pCur->pInsert, 0);
     sqlite3_free(zIns);
 
+    char *zDel = sqlite3_mprintf(
+        "DELETE FROM %s.%s WHERE rowid = ?", pCur->pParent->zDb, pCur->pParent->zTable);
+    sqlite3_prepare(pCur->pParent->db, zDel, -1, &pCur->pDelete, 0);
+    sqlite3_free(zDel);
+
     *ppVtabCur = &pCur->base;
     return SQLITE_OK;
 }
@@ -303,6 +339,7 @@ static int nadekoClose(sqlite3_vtab_cursor *pVtabCur) {
     nadeko_cursor *pCur = (nadeko_cursor *)pVtabCur;
     sqlite3_finalize(pCur->pSelect);
     sqlite3_finalize(pCur->pInsert);
+    sqlite3_finalize(pCur->pDelete);
     sqlite3_free(pCur);
     return SQLITE_OK;
 }
@@ -433,6 +470,138 @@ static int nadekoBestIndex(sqlite3_vtab *, sqlite3_index_info *) { return SQLITE
 */
 static int nadekoShadowName(const char *pName) { return sqlite3_stricmp(pName, "store"); }
 
+static int nadekoUpdate(
+    sqlite3_vtab *pVtab, int argc, sqlite3_value **argv, sqlite_int64 *pRowid) {
+    puts("::Update::");
+    nadeko_vtab *pNdk = (nadeko_vtab *)(pVtab);
+    int rc;
+
+    if (argc == 1) {
+        // DELETE
+        sqlite3_stmt *pDelete;
+        char *zDel =
+            sqlite3_mprintf("DELETE FROM %s.%s WHERE rowid = ?", pNdk->zDb, pNdk->zTable);
+        sqlite3_prepare(pNdk->db, zDel, -1, &pDelete, 0);
+        sqlite3_free(zDel);
+        sqlite3_bind_value(pDelete, 1, argv[0]);
+        sqlite3_step(pDelete);
+        sqlite3_finalize(pDelete);
+    } else {
+        // INSERT OR UPDATE
+        // TODO: Handle "INSERT OR REPLACE" specially
+        sqlite3_stmt *pInsert;
+        char *zIns =
+            sqlite3_mprintf("INSERT OR REPLACE INTO %s.%s (rowid, filename, contents)"
+                            "VALUES (?, ?, ?)",
+                pNdk->zDb,
+                pNdk->zTable);
+        sqlite3_prepare(pNdk->db, zIns, -1, &pInsert, 0);
+        sqlite3_free(zIns);
+        sqlite3_bind_value(pInsert, 1, argv[1]);
+        sqlite3_bind_value(pInsert, 2, argv[2]);
+        sqlite3_bind_value(pInsert, 3, argv[3]);
+        if ((rc = sqlite3_step(pInsert))) {
+            sqlite3_finalize(pInsert);
+            return sqlite3_extended_errcode(pNdk->db);
+        }
+        *pRowid = sqlite3_last_insert_rowid(pNdk->db);
+        sqlite3_finalize(pInsert);
+    }
+
+    return SQLITE_OK;
+}
+
+static int nadekoBegin(sqlite3_vtab *pVtab) {
+    puts("::Begin::");
+    nadeko_vtab *pNdk = (nadeko_vtab *)(pVtab);
+    pNdk->iBegun = 1;
+
+    return SQLITE_OK;
+}
+
+static int nadekoSync(sqlite3_vtab *pVtab) {
+    puts("::Sync::");
+    nadeko_vtab *pNdk = (nadeko_vtab *)(pVtab);
+    if (pNdk->iBegun == 0) {
+        return SQLITE_OK;
+    }
+
+    puts("::RealSync::");
+    struct archive *a = archive_write_new();
+    int rc = SQLITE_OK;
+    archive_write_set_format_filter_by_ext(a, pNdk->zFilename);
+    archive_write_open_filename(a, pNdk->zTempname);
+
+    sqlite3_stmt *pSelect;
+    char *zSel =
+        sqlite3_mprintf("SELECT filename, rowid FROM %s.%s", pNdk->zDb, pNdk->zTable);
+    sqlite3_prepare(pNdk->db, zSel, -1, &pSelect, 0);
+    sqlite3_free(zSel);
+
+    sqlite3_blob *pBlob;
+    sqlite3_blob_open(pNdk->db, pNdk->zDb, pNdk->zTable, "contents", 0, 0, &pBlob);
+    struct archive_entry *entry = archive_entry_new();
+    for (;;) {
+        switch (sqlite3_step(pSelect)) {
+        case SQLITE_ROW:
+            sqlite3_blob_reopen(pBlob, sqlite3_column_int64(pSelect, 1));
+            archive_entry_set_pathname(entry, (char *)(sqlite3_column_text(pSelect, 0)));
+            archive_entry_set_size(entry, sqlite3_blob_bytes(pBlob));
+            archive_entry_set_filetype(entry, AE_IFREG);
+            archive_entry_set_perm(entry, 0644);
+            archive_write_header(a, entry);
+            nadekoFillArchiveFromBlob(a, pBlob);
+            archive_entry_clear(entry);
+            break;
+        case SQLITE_DONE:
+            rc = SQLITE_OK;
+            goto done;
+        default:
+            goto done;
+        }
+    }
+
+done:
+    sqlite3_finalize(pSelect);
+    archive_entry_free(entry);
+    archive_write_close(a);
+    archive_write_free(a);
+
+    return rc;
+}
+
+static int nadekoCommit(sqlite3_vtab *pVtab) {
+    puts("::Commit::");
+    nadeko_vtab *pNdk = (nadeko_vtab *)(pVtab);
+    if (pNdk->iBegun == 0) {
+        return SQLITE_OK;
+    } else {
+        pNdk->iBegun = 0;
+    }
+
+    puts("::RealCommit::");
+    if (rename(pNdk->zTempname, pNdk->zFilename)) {
+        remove(pNdk->zTempname);
+        return SQLITE_ERROR;
+    } else {
+        return SQLITE_OK;
+    }
+}
+
+static int nadekoRollback(sqlite3_vtab *pVtab) {
+    puts("::Rollback::");
+    nadeko_vtab *pNdk = (nadeko_vtab *)(pVtab);
+    if (pNdk->iBegun == 0) {
+        return SQLITE_OK;
+    } else {
+        pNdk->iBegun = 0;
+    }
+
+    puts("::RealRollback::");
+    remove(pNdk->zTempname);
+    return SQLITE_OK;
+}
+
 /*
 ** This following structure defines all the methods for the
 ** virtual table.
@@ -451,11 +620,11 @@ static sqlite3_module nadekoModule = {
     /* xEof        */ nadekoEof,
     /* xColumn     */ nadekoColumn,
     /* xRowid      */ nadekoRowid,
-    /* xUpdate     */ 0,
-    /* xBegin      */ 0,
-    /* xSync       */ 0,
-    /* xCommit     */ 0,
-    /* xRollback   */ 0,
+    /* xUpdate     */ nadekoUpdate,
+    /* xBegin      */ nadekoBegin,
+    /* xSync       */ nadekoSync,
+    /* xCommit     */ nadekoCommit,
+    /* xRollback   */ nadekoRollback,
     /* xFindMethod */ 0,
     /* xRename     */ 0,
     /* xSavepoint  */ 0,
