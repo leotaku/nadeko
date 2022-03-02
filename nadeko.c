@@ -125,7 +125,7 @@ static int nadekoExecPrintf(sqlite3 *db, char **pzErr, const char *zFormat, ...)
 
 /*
 ** Fill the BLOB pointed at by the given arguments with
-** data from the given archive.
+** data from the given archive handle.
 */
 static int nadekoFillBlobFromArchive(struct archive *a, sqlite3 *db, const char *zDb,
     const char *zTable, const char *zColumn, int iRowid) {
