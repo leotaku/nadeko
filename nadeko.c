@@ -279,7 +279,7 @@ static int nadekoCreate(sqlite3 *db, void *pAux, int argc, const char *const *ar
         pzErr,
         "CREATE TABLE IF NOT EXISTS %s.%s_store ("
         "  filename TEXT PRIMARY KEY,"
-        "  contents BLOB,"
+        "  contents BLOB"
         ")",
         argv[1],
         argv[2]);
