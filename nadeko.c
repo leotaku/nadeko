@@ -204,6 +204,7 @@ struct nadeko_cursor {
     sqlite3_stmt *pSelect;
     sqlite3_stmt *pInsert;
     sqlite3_stmt *pDelete;
+    sqlite3_int64 iEof;
 };
 
 /*
@@ -387,7 +388,9 @@ static int nadekoNext(sqlite3_vtab_cursor *pVtabCur) {
 
     sqlite3_reset(pCur->pSelect);
     sqlite3_bind_int(pCur->pSelect, 1, pCur->iRowid);
-    sqlite3_step(pCur->pSelect);
+    if (sqlite3_step(pCur->pSelect) == SQLITE_DONE) {
+        pCur->iEof = 1;
+    }
 
     return rc;
 }
@@ -436,7 +439,7 @@ static int nadekoRowid(sqlite3_vtab_cursor *pVtabCur, sqlite_int64 *pRowid) {
 */
 static int nadekoEof(sqlite3_vtab_cursor *pVtabCur) {
     nadeko_cursor *pCur = (nadeko_cursor *)pVtabCur;
-    return pCur->iRowid > pCur->pParent->iKnown && pCur->pParent->pArchive == 0;
+    return pCur->iEof;
 }
 
 /*
@@ -450,6 +453,7 @@ static int nadekoFilter(
     int rc = SQLITE_OK;
     nadeko_cursor *pCur = (nadeko_cursor *)pVtabCur;
     pCur->iRowid = 0;
+    pCur->iEof = 0;
 
     return rc || nadekoNext(pVtabCur);
 }
