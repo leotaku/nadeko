@@ -473,7 +473,6 @@ static int nadekoShadowName(const char *pName) { return sqlite3_stricmp(pName, "
 
 static int nadekoUpdate(
     sqlite3_vtab *pVtab, int argc, sqlite3_value **argv, sqlite_int64 *pRowid) {
-    puts("::Update::");
     nadeko_vtab *pNdk = (nadeko_vtab *)(pVtab);
 
     if (argc == 1) {
@@ -512,7 +511,6 @@ static int nadekoUpdate(
 }
 
 static int nadekoBegin(sqlite3_vtab *pVtab) {
-    puts("::Begin::");
     nadeko_vtab *pNdk = (nadeko_vtab *)(pVtab);
     pNdk->iBegun = 1;
 
@@ -520,13 +518,11 @@ static int nadekoBegin(sqlite3_vtab *pVtab) {
 }
 
 static int nadekoSync(sqlite3_vtab *pVtab) {
-    puts("::Sync::");
     nadeko_vtab *pNdk = (nadeko_vtab *)(pVtab);
     if (pNdk->iBegun == 0) {
         return SQLITE_OK;
     }
 
-    puts("::RealSync::");
     struct archive *a = archive_write_new();
     int rc = SQLITE_OK;
     archive_write_set_format_filter_by_ext(a, pNdk->zFilename);
@@ -581,7 +577,6 @@ done:
 }
 
 static int nadekoCommit(sqlite3_vtab *pVtab) {
-    puts("::Commit::");
     nadeko_vtab *pNdk = (nadeko_vtab *)(pVtab);
     if (pNdk->iBegun == 0) {
         return SQLITE_OK;
@@ -589,7 +584,6 @@ static int nadekoCommit(sqlite3_vtab *pVtab) {
         pNdk->iBegun = 0;
     }
 
-    puts("::RealCommit::");
     if (rename(pNdk->zTempname, pNdk->zFilename)) {
         remove(pNdk->zTempname);
         return SQLITE_ERROR;
@@ -599,7 +593,6 @@ static int nadekoCommit(sqlite3_vtab *pVtab) {
 }
 
 static int nadekoRollback(sqlite3_vtab *pVtab) {
-    puts("::Rollback::");
     nadeko_vtab *pNdk = (nadeko_vtab *)(pVtab);
     if (pNdk->iBegun == 0) {
         return SQLITE_OK;
@@ -607,7 +600,6 @@ static int nadekoRollback(sqlite3_vtab *pVtab) {
         pNdk->iBegun = 0;
     }
 
-    puts("::RealRollback::");
     remove(pNdk->zTempname);
     return SQLITE_OK;
 }
