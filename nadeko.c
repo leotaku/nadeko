@@ -160,16 +160,13 @@ static int nadekoFillArchiveFromBlob(struct archive *a, sqlite3_blob *pBlob) {
         int write =
             offset + NADEKO_BUFFER_SIZE < bytes ? NADEKO_BUFFER_SIZE : bytes - offset;
         if (sqlite3_blob_read(pBlob, buf, write, offset)) {
-            sqlite3_blob_close(pBlob);
             return SQLITE_ERROR;
         }
         if (archive_write_data(a, buf, write) == -1) {
-            sqlite3_blob_close(pBlob);
             return SQLITE_ERROR;
         }
     }
 
-    sqlite3_blob_close(pBlob);
     return SQLITE_OK;
 }
 
@@ -542,13 +539,22 @@ static int nadekoSync(sqlite3_vtab *pVtab) {
     sqlite3_prepare(pNdk->db, zSel, -1, &pSelect, 0);
     sqlite3_free(zSel);
 
-    sqlite3_blob *pBlob;
-    sqlite3_blob_open(pNdk->db, pNdk->zDb, pNdk->zTable, "contents", 0, 0, &pBlob);
+    sqlite3_blob *pBlob = 0;
     struct archive_entry *entry = archive_entry_new();
     for (;;) {
         switch (sqlite3_step(pSelect)) {
         case SQLITE_ROW:
-            sqlite3_blob_reopen(pBlob, sqlite3_column_int64(pSelect, 1));
+            if (pBlob) {
+                sqlite3_blob_reopen(pBlob, sqlite3_column_int64(pSelect, 1));
+            } else {
+                sqlite3_blob_open(pNdk->db,
+                    pNdk->zDb,
+                    pNdk->zTable,
+                    "contents",
+                    sqlite3_column_int(pSelect, 1),
+                    0,
+                    &pBlob);
+            }
             archive_entry_set_pathname(entry, (char *)(sqlite3_column_text(pSelect, 0)));
             archive_entry_set_size(entry, sqlite3_blob_bytes(pBlob));
             archive_entry_set_filetype(entry, AE_IFREG);
@@ -566,6 +572,7 @@ static int nadekoSync(sqlite3_vtab *pVtab) {
     }
 
 done:
+    sqlite3_blob_close(pBlob);
     sqlite3_finalize(pSelect);
     archive_entry_free(entry);
     archive_write_close(a);
