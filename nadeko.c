@@ -475,7 +475,6 @@ static int nadekoUpdate(
     sqlite3_vtab *pVtab, int argc, sqlite3_value **argv, sqlite_int64 *pRowid) {
     puts("::Update::");
     nadeko_vtab *pNdk = (nadeko_vtab *)(pVtab);
-    int rc;
 
     if (argc == 1) {
         // DELETE
@@ -501,7 +500,7 @@ static int nadekoUpdate(
         sqlite3_bind_value(pInsert, 1, argv[1]);
         sqlite3_bind_value(pInsert, 2, argv[2]);
         sqlite3_bind_value(pInsert, 3, argv[3]);
-        if ((rc = sqlite3_step(pInsert))) {
+        if (sqlite3_step(pInsert)) {
             sqlite3_finalize(pInsert);
             return sqlite3_extended_errcode(pNdk->db);
         }
