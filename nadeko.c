@@ -362,13 +362,18 @@ static int nadekoNext(sqlite3_vtab_cursor *pVtabCur) {
             sqlite3_bind_zeroblob(pCur->pInsert, 3, archive_entry_size(pCur->pEntry));
             sqlite3_step(pCur->pInsert);
             sqlite3_reset(pCur->pInsert);
-            nadekoFillBlobFromArchive(pCur->pParent->pArchive,
-                pCur->pParent->db,
-                pCur->pParent->zDb,
-                pCur->pParent->zTable,
-                "contents",
-                pCur->iRowid);
-            pCur->pParent->iKnown++;
+            if ((rc = nadekoFillBlobFromArchive(pCur->pParent->pArchive,
+                     pCur->pParent->db,
+                     pCur->pParent->zDb,
+                     pCur->pParent->zTable,
+                     "contents",
+                     pCur->iRowid))) {
+                pVtabCur->pVtab->zErrMsg =
+                    sqlite3_mprintf("%s", archive_error_string(pCur->pParent->pArchive));
+                rc = SQLITE_ERROR;
+            } else {
+                pCur->pParent->iKnown++;
+            }
             break;
         case ARCHIVE_EOF:
             archive_read_free(pCur->pParent->pArchive);
@@ -554,8 +559,18 @@ static int nadekoSync(sqlite3_vtab *pVtab) {
             archive_entry_set_size(entry, sqlite3_blob_bytes(pBlob));
             archive_entry_set_filetype(entry, AE_IFREG);
             archive_entry_set_perm(entry, 0644);
-            archive_write_header(a, entry);
-            nadekoFillArchiveFromBlob(a, pBlob);
+            if ((rc = archive_write_header(a, entry))) {
+                pVtab->zErrMsg =
+                    sqlite3_mprintf("%s", archive_error_string(pNdk->pArchive));
+                rc = SQLITE_ERROR;
+                goto done;
+            };
+            if ((rc = nadekoFillArchiveFromBlob(a, pBlob))) {
+                pVtab->zErrMsg =
+                    sqlite3_mprintf("%s", archive_error_string(pNdk->pArchive));
+                rc = SQLITE_ERROR;
+                goto done;
+            };
             archive_entry_clear(entry);
             break;
         case SQLITE_DONE:
