@@ -563,25 +563,25 @@ static int nadekoSync(sqlite3_vtab *pVtab) {
                 pVtab->zErrMsg =
                     sqlite3_mprintf("%s", archive_error_string(pNdk->pArchive));
                 rc = SQLITE_ERROR;
-                goto done;
+                goto cleanup;
             };
             if ((rc = nadekoFillArchiveFromBlob(a, pBlob))) {
                 pVtab->zErrMsg =
                     sqlite3_mprintf("%s", archive_error_string(pNdk->pArchive));
                 rc = SQLITE_ERROR;
-                goto done;
+                goto cleanup;
             };
             archive_entry_clear(entry);
             break;
         case SQLITE_DONE:
             rc = SQLITE_OK;
-            goto done;
+            goto cleanup;
         default:
-            goto done;
+            goto cleanup;
         }
     }
 
-done:
+cleanup:
     sqlite3_blob_close(pBlob);
     sqlite3_finalize(pSelect);
     archive_entry_free(entry);
