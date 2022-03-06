@@ -517,9 +517,13 @@ static int nadekoUpdate(
 
 static int nadekoBegin(sqlite3_vtab *pVtab) {
     nadeko_vtab *pNdk = (nadeko_vtab *)(pVtab);
-    pNdk->iBegun = 1;
-
-    return SQLITE_OK;
+    if (nadekoIsDirectory(pNdk->zFilename)) {
+        pVtab->zErrMsg = sqlite3_mprintf("directories are not writable using nadeko()");
+        return SQLITE_ERROR;
+    } else {
+        pNdk->iBegun = 1;
+        return SQLITE_OK;
+    }
 }
 
 static int nadekoSync(sqlite3_vtab *pVtab) {
