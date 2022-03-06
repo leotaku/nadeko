@@ -129,40 +129,40 @@ static int nadekoExecPrintf(sqlite3 *db, char **pzErr, const char *zFormat, ...)
 */
 static int nadekoFillBlobFromArchive(struct archive *a, sqlite3 *db, const char *zDb,
     const char *zTable, const char *zColumn, int iRowid) {
-    sqlite3_blob *blob;
-    int offset = 0;
+    sqlite3_blob *pBlob;
+    int iOffset = 0;
     int rc;
 
-    if ((rc = sqlite3_blob_open(db, zDb, zTable, zColumn, iRowid, 1, &blob))) return rc;
+    if ((rc = sqlite3_blob_open(db, zDb, zTable, zColumn, iRowid, 1, &pBlob))) return rc;
     for (;;) {
-        char buf[NADEKO_BUFFER_SIZE];
-        int read = archive_read_data(a, buf, NADEKO_BUFFER_SIZE);
-        if (read == -1) {
-            sqlite3_blob_close(blob);
+        char aBuf[NADEKO_BUFFER_SIZE];
+        int iRead = archive_read_data(a, aBuf, NADEKO_BUFFER_SIZE);
+        if (iRead == -1) {
+            sqlite3_blob_close(pBlob);
             return SQLITE_ERROR;
-        } else if (read == 0) {
-            sqlite3_blob_close(blob);
+        } else if (iRead == 0) {
+            sqlite3_blob_close(pBlob);
             return SQLITE_OK;
         } else {
-            if ((rc = sqlite3_blob_write(blob, buf, read, offset))) {
-                sqlite3_blob_close(blob);
+            if ((rc = sqlite3_blob_write(pBlob, aBuf, iRead, iOffset))) {
+                sqlite3_blob_close(pBlob);
                 return rc;
             }
-            offset += read;
+            iOffset += iRead;
         }
     }
 }
 
 static int nadekoFillArchiveFromBlob(struct archive *a, sqlite3_blob *pBlob) {
-    char buf[NADEKO_BUFFER_SIZE];
-    int bytes = sqlite3_blob_bytes(pBlob);
-    for (int offset = 0; offset < bytes; offset += NADEKO_BUFFER_SIZE) {
-        int write =
-            offset + NADEKO_BUFFER_SIZE < bytes ? NADEKO_BUFFER_SIZE : bytes - offset;
-        if (sqlite3_blob_read(pBlob, buf, write, offset)) {
+    char aBuf[NADEKO_BUFFER_SIZE];
+    int iBytes = sqlite3_blob_bytes(pBlob);
+    for (int iOffset = 0; iOffset < iBytes; iOffset += NADEKO_BUFFER_SIZE) {
+        int iWrite =
+            iOffset + NADEKO_BUFFER_SIZE < iBytes ? NADEKO_BUFFER_SIZE : iBytes - iOffset;
+        if (sqlite3_blob_read(pBlob, aBuf, iWrite, iOffset)) {
             return SQLITE_ERROR;
         }
-        if (archive_write_data(a, buf, write) == -1) {
+        if (archive_write_data(a, aBuf, iWrite) == -1) {
             return SQLITE_ERROR;
         }
     }
