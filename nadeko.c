@@ -86,6 +86,27 @@ abort:
 }
 
 /*
+** Parse and return the next entry header from the given archive,
+** skipping any directory entries if reading from disk.
+*/
+static int nadekoArchiveReadNextHeader(
+    struct archive *a, struct archive_entry **ppEntry) {
+    for (;;) {
+        int rc = archive_read_next_header(a, ppEntry);
+
+        if (rc != ARCHIVE_OK) {
+            return rc;
+        } else if (archive_format(a) != 0) {
+            return ARCHIVE_OK;
+        } else if (!archive_read_disk_can_descend(a)) {
+            return ARCHIVE_OK;
+        } else {
+            archive_read_disk_descend(a);
+        }
+    };
+}
+
+/*
 ** Return string with first and last character removed.
 */
 static char *nadekoUnquote(const char *zString) {
@@ -351,7 +372,7 @@ static int nadekoNext(sqlite3_vtab_cursor *pVtabCur) {
     pCur->iRowid++;
 
     if (pCur->pParent->pArchive != 0 && pCur->iRowid > pCur->pParent->iKnown) {
-        switch (archive_read_next_header(pCur->pParent->pArchive, &pCur->pEntry)) {
+        switch (nadekoArchiveReadNextHeader(pCur->pParent->pArchive, &pCur->pEntry)) {
         case ARCHIVE_OK:
             sqlite3_bind_int(pCur->pInsert, 1, pCur->pParent->iKnown + 1);
             sqlite3_bind_text(pCur->pInsert,
