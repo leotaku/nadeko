@@ -89,8 +89,7 @@ abort:
 ** Parse and return the next entry header from the given archive,
 ** skipping any directory entries if reading from disk.
 */
-static int nadekoArchiveReadNextHeader(
-    struct archive *a, struct archive_entry **ppEntry) {
+static int nadekoArchiveNextHeader(struct archive *a, struct archive_entry **ppEntry) {
     for (;;) {
         int rc = archive_read_next_header(a, ppEntry);
 
@@ -372,7 +371,7 @@ static int nadekoNext(sqlite3_vtab_cursor *pVtabCur) {
     pCur->iRowid++;
 
     if (pCur->pParent->pArchive != 0 && pCur->iRowid > pCur->pParent->iKnown) {
-        switch (nadekoArchiveReadNextHeader(pCur->pParent->pArchive, &pCur->pEntry)) {
+        switch (nadekoArchiveNextHeader(pCur->pParent->pArchive, &pCur->pEntry)) {
         case ARCHIVE_OK:
             sqlite3_bind_int(pCur->pInsert, 1, pCur->pParent->iKnown + 1);
             sqlite3_bind_text(pCur->pInsert,
