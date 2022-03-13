@@ -26,9 +26,18 @@ nadeko_lib = both_libraries(
   pic : true,
   install : true,
 )
+lines_lib = both_libraries(
+  'lines', [ 'lines.c' ],
+  dependencies : [ sqlite3_dep ],
+  pic : true,
+  install : true,
+)
 
 nadeko_dep = declare_dependency(
   link_with : [ nadeko_lib ],
+)
+lines_dep = declare_dependency(
+  link_with : [ lines_lib ],
 )
 
 snake_exe = executable(
