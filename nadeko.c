@@ -1,36 +1,16 @@
 /*
-** This file implements a template virtual-table.
-** Developers can make a copy of this file as a baseline for writing
-** new virtual tables and/or table-valued functions.
+** This file implements a virtual table with a rowid and two columns
+** named "filename" and "contents".  The table returns filename and
+** contents of files stored in the associated archive or directory as
+** values of the "filename" and "contents" column respectively.
+** Support for each archive format or filesystem access is determined
+** by the support of BSD libarchive for the given format or OS.
+** Filesystems only support read access.  Usage example:
 **
-** Steps for writing a new virtual table implementation:
-**
-**     (1)  Make a copy of this file.  Perhaps call it "mynewvtab.c"
-**
-**     (2)  Replace this header comment with something appropriate for
-**          the new virtual table
-**
-**     (3)  Change every occurrence of "templatevtab" to some other string
-**          appropriate for the new virtual table.  Ideally, the new string
-**          should be the basename of the source file: "mynewvtab".  Also
-**          globally change "TEMPLATEVTAB" to "MYNEWVTAB".
-**
-**     (4)  Run a test compilation to make sure the unmodified virtual
-**          table works.
-**
-**     (5)  Begin making incremental changes, testing as you go, to evolve
-**          the new virtual table to do what you want it to do.
-**
-** This template is minimal, in the sense that it uses only the required
-** methods on the sqlite3_module object.  As a result, templatevtab is
-** a read-only and eponymous-only table.  Those limitation can be removed
-** by adding new methods.
-**
-** This template implements an eponymous-only virtual table with a rowid and
-** two columns named "a" and "b".  The table as 10 rows with fixed integer
-** values. Usage example:
-**
-**     SELECT rowid, a, b FROM templatevtab;
+**     CREATE VIRTUAL TABLE archive USING nadeko('./example.tar');
+**     SELECT filename, contents FROM archive;
+**     INSERT OR REPLACE INTO archive(filename, contents)
+**     VALUES ('example.txt', 'Domine, quo vadis?');
 */
 #include <assert.h>
 #include <stddef.h>
