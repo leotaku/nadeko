@@ -11,7 +11,7 @@
     SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX
 #define READ_BUFFER_SIZE 1 << 16
 
-void consumeSingleStatement(char **ppPoint, int *pLinum, int isOutside) {
+void consumeSingleStatement(char **ppPoint, sqlite3_int64 *pLinum, int isOutside) {
     int isInLargeComment = 0;
     for (;;) {
         if (*ppPoint[0] == '\0') {
@@ -62,12 +62,12 @@ int readAndLoadFile(sqlite3 *db, const char *zFilename) {
         return errno;
     }
 
-    int iEndLinum = 1;
+    sqlite3_int64 iEndLinum = 1;
     char *pEnd = buf;
     for (;;) {
         // Find start of SQL statement
         char *pStart = pEnd;
-        int iStartLinum = iEndLinum;
+        sqlite3_int64 iStartLinum = iEndLinum;
         consumeSingleStatement(&pStart, &iStartLinum, 1);
         if (pStart[0] == '\0') {
             fclose(fd);
@@ -79,7 +79,7 @@ int readAndLoadFile(sqlite3 *db, const char *zFilename) {
         iEndLinum = iStartLinum;
         consumeSingleStatement(&pEnd, &iEndLinum, 0);
         if (pEnd[0] == '\0') {
-            fprintf(stderr, "error: %s:%i: unterminated SQL\n", zFilename, iStartLinum);
+            fprintf(stderr, "error: %s:%llu: unterminated SQL\n", zFilename, iStartLinum);
             fclose(fd);
             return SQLITE_ERROR;
         };
@@ -88,7 +88,7 @@ int readAndLoadFile(sqlite3 *db, const char *zFilename) {
         char *zErr = 0;
         pEnd[-1] = '\0';
         if (sqlite3_exec(db, pStart, 0, 0, &zErr) != SQLITE_OK) {
-            fprintf(stderr, "error: %s:%i: %s\n", zFilename, iStartLinum, zErr);
+            fprintf(stderr, "error: %s:%llu: %s\n", zFilename, iStartLinum, zErr);
             sqlite3_free(zErr);
             fclose(fd);
             return SQLITE_ERROR;
