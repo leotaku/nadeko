@@ -140,6 +140,7 @@ int traceLogCallback(unsigned int uMask, void *, void *pData, void *pCtx) {
     return SQLITE_OK;
 }
 
+char *stringOptionDatabase = ":memory:";
 int isOptionDebug = 0;
 int isOptionTrace = 0;
 
@@ -151,6 +152,13 @@ int parseCommandArgs(int argc, char *argv[]) {
             isOptionDebug = 1;
         } else if (!strcmp(argv[n], "--trace")) {
             isOptionTrace = 1;
+        } else if (!strcmp(argv[n], "--output")) {
+            if (n + 1 < argc && strncmp(argv[n + 1], "--", 2)) {
+                stringOptionDatabase = argv[++n];
+            } else {
+                fprintf(stderr, "error: missing argument to switch \"%s\"\n", argv[n]);
+                return SQLITE_ERROR;
+            }
         } else if (!strncmp(argv[n], "--", 2)) {
             fprintf(stderr, "error: unknown switch \"%s\"\n", argv[n]);
             return SQLITE_ERROR;
@@ -161,6 +169,9 @@ int parseCommandArgs(int argc, char *argv[]) {
 
     if (iPositional < 1) {
         fprintf(stderr, "error: missing positional argument\n");
+        return SQLITE_ERROR;
+    } else if (iPositional > 1) {
+        fprintf(stderr, "error: too many positional arguments\n");
         return SQLITE_ERROR;
     }
 
@@ -182,7 +193,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "internal: setting debug: %s", sqlite3_errstr(rc));
     } else if ((rc = sqlite3_initialize())) {
         fprintf(stderr, "internal: initializing sqlite: %s", sqlite3_errstr(rc));
-    } else if ((rc = sqlite3_open_v2(":memory:", &db, FLAG_SQLITE_OPEN, 0))) {
+    } else if ((rc = sqlite3_open_v2(stringOptionDatabase, &db, FLAG_SQLITE_OPEN, 0))) {
         fprintf(stderr, "internal: opening in-memory database: %s", sqlite3_errstr(rc));
     } else if (isOptionTrace &&
                (rc = sqlite3_trace_v2(db, FLAG_SQLITE_TRACE, traceLogCallback, 0))) {
