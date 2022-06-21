@@ -40,8 +40,8 @@ lines_dep = declare_dependency(
   link_with : [ lines_lib ],
 )
 
-snake_exe = executable(
-  'snake', [ 'snake.c' ],
+nadeko_exe = executable(
+  'nadeko', [ 'main.c' ],
   override_options : [ 'b_sanitize=address,undefined' ],
   c_args : [ '-DSQLITE_CORE' ],
   dependencies : [ libarchive_dep, sqlite3_dep ],
