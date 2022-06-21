@@ -1,6 +1,6 @@
+#include "lines.c"
+#include "nadeko.c"
 #include <errno.h>
-#include <lines.c>
-#include <nadeko.c>
 #include <sqlite3.h>
 #include <stdio.h>
 #include <string.h>
