@@ -143,6 +143,7 @@ int traceLogCallback(unsigned int uMask, void *, void *pData, void *pCtx) {
 char *stringOptionDatabase = ":memory:";
 int isOptionDebug = 0;
 int isOptionTrace = 0;
+int isOptionWipe = 0;
 
 int parseCommandArgs(int argc, char *argv[]) {
     int iPositional = 0;
@@ -152,6 +153,8 @@ int parseCommandArgs(int argc, char *argv[]) {
             isOptionDebug = 1;
         } else if (!strcmp(argv[n], "--trace")) {
             isOptionTrace = 1;
+        } else if (!strcmp(argv[n], "--wipe")) {
+            isOptionWipe = 1;
         } else if (!strcmp(argv[n], "--output")) {
             if (n + 1 < argc && strncmp(argv[n + 1], "--", 2)) {
                 stringOptionDatabase = argv[++n];
@@ -195,6 +198,11 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "internal: initializing sqlite: %s", sqlite3_errstr(rc));
     } else if ((rc = sqlite3_open_v2(stringOptionDatabase, &db, FLAG_SQLITE_OPEN, 0))) {
         fprintf(stderr, "internal: opening in-memory database: %s", sqlite3_errstr(rc));
+    } else if (isOptionWipe &&
+               (rc = sqlite3_db_config(db, SQLITE_DBCONFIG_RESET_DATABASE, 1, 0) ||
+                     sqlite3_exec(db, "VACUUM", 0, 0, 0) ||
+                     sqlite3_db_config(db, SQLITE_DBCONFIG_RESET_DATABASE, 0, 0))) {
+        fprintf(stderr, "internal: wiping database: %s", sqlite3_errstr(rc));
     } else if (isOptionTrace &&
                (rc = sqlite3_trace_v2(db, FLAG_SQLITE_TRACE, traceLogCallback, 0))) {
         fprintf(stderr, "internal: setting tracing: %s", sqlite3_errstr(rc));
