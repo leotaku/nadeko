@@ -197,7 +197,7 @@ int main(int argc, char *argv[]) {
     } else if ((rc = sqlite3_initialize())) {
         fprintf(stderr, "internal: initializing sqlite: %s", sqlite3_errstr(rc));
     } else if ((rc = sqlite3_open_v2(stringOptionDatabase, &db, FLAG_SQLITE_OPEN, 0))) {
-        fprintf(stderr, "internal: opening in-memory database: %s", sqlite3_errstr(rc));
+        fprintf(stderr, "internal: opening database: %s", sqlite3_errstr(rc));
     } else if (isOptionWipe &&
                (rc = sqlite3_db_config(db, SQLITE_DBCONFIG_RESET_DATABASE, 1, 0) ||
                      sqlite3_exec(db, "VACUUM", 0, 0, 0) ||
