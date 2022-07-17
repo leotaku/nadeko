@@ -43,26 +43,35 @@ static int nadekoIsDirectory(const char *zFilename) {
 }
 
 /*
-** Return archive handle to the disk archive or directory
-** pointed at by the given filename.
+** Return handle to the archive file pointed at by the given filename.
 */
-static int nadekoOpenThing(struct archive **pa, const char *zFilename, char **pzErr) {
+static int nadekoOpenArchive(struct archive **pa, const char *zFilename, char **pzErr) {
     int rc = 0;
-    if (nadekoIsDirectory(zFilename)) {
-        *pa = archive_read_disk_new();
-        if ((rc = archive_read_disk_open(*pa, zFilename))) goto abort;
-    } else {
-        *pa = archive_read_new();
-        archive_read_support_format_all(*pa);
-        archive_read_support_filter_all(*pa);
-        if ((rc = archive_read_open_filename(*pa, zFilename, 10240))) goto abort;
-    }
-    return 0;
+    *pa = archive_read_new();
+    archive_read_support_format_all(*pa);
+    archive_read_support_filter_all(*pa);
+    if ((rc = archive_read_open_filename(*pa, zFilename, 10240))) {
+        *pzErr = sqlite3_mprintf("%s", archive_error_string(*pa));
+        archive_read_close(*pa);
+        return rc;
+    };
 
-abort:
-    *pzErr = sqlite3_mprintf("%s", archive_error_string(*pa));
-    archive_read_close(*pa);
-    return rc;
+    return 0;
+}
+
+/*
+** Return handle to the directory pointed at by the given filename.
+*/
+static int nadekoOpenDirectory(struct archive **pa, const char *zFilename, char **pzErr) {
+    int rc = 0;
+    *pa = archive_read_disk_new();
+    if ((rc = archive_read_disk_open(*pa, zFilename))) {
+        *pzErr = sqlite3_mprintf("%s", archive_error_string(*pa));
+        archive_read_close(*pa);
+        return rc;
+    }
+
+    return 0;
 }
 
 /*
@@ -179,6 +188,7 @@ struct nadeko_vtab {
                        /* Insert new fields here */
     sqlite3 *db;
     struct archive *pArchive;
+    int isFilesystem;
     sqlite3_int64 iKnown;
     sqlite3_int64 iBegun;
     char *zFilename;
@@ -256,9 +266,16 @@ static int nadekoConnect(sqlite3 *db, void *, int argc, const char *const *argv,
     if (!(pNew->zTempname = tmpnam(sqlite3_malloc(L_tmpnam * sizeof(char))))) {
         return SQLITE_NOMEM;
     }
-    if ((rc = nadekoOpenThing(&pNew->pArchive, pNew->zFilename, pzErr))) {
-        nadekoDisconnect(&pNew->base);
-        return SQLITE_ERROR;
+    if ((pNew->isFilesystem = nadekoIsDirectory(pNew->zFilename))) {
+        if ((rc = nadekoOpenDirectory(&pNew->pArchive, pNew->zFilename, pzErr))) {
+            nadekoDisconnect(&pNew->base);
+            return SQLITE_ERROR;
+        }
+    } else {
+        if ((rc = nadekoOpenArchive(&pNew->pArchive, pNew->zFilename, pzErr))) {
+            nadekoDisconnect(&pNew->base);
+            return SQLITE_ERROR;
+        }
     }
 
     /* For convenience, define symbolic names for the index to each column. */
@@ -354,11 +371,12 @@ static int nadekoNext(sqlite3_vtab_cursor *pVtabCur) {
         switch (nadekoArchiveNextHeader(pCur->pParent->pArchive, &pCur->pEntry)) {
         case ARCHIVE_OK:
             sqlite3_bind_int(pCur->pInsert, 1, pCur->pParent->iKnown + 1);
-            sqlite3_bind_text(pCur->pInsert,
-                2,
-                archive_entry_pathname(pCur->pEntry),
-                -1,
-                SQLITE_TRANSIENT);
+            const char *pathname = archive_entry_pathname(pCur->pEntry);
+            if (pCur->pParent->isFilesystem) {
+                pathname += strlen(pCur->pParent->zFilename);
+                if (pathname[0] == '/') pathname++;
+            }
+            sqlite3_bind_text(pCur->pInsert, 2, pathname, -1, SQLITE_TRANSIENT);
             sqlite3_bind_zeroblob(pCur->pInsert, 3, archive_entry_size(pCur->pEntry));
             sqlite3_step(pCur->pInsert);
             sqlite3_reset(pCur->pInsert);
@@ -517,7 +535,7 @@ static int nadekoUpdate(
 
 static int nadekoBegin(sqlite3_vtab *pVtab) {
     nadeko_vtab *pNdk = (nadeko_vtab *)(pVtab);
-    if (nadekoIsDirectory(pNdk->zFilename)) {
+    if (pNdk->isFilesystem) {
         pVtab->zErrMsg = sqlite3_mprintf("directories are not writable using nadeko()");
         return SQLITE_ERROR;
     } else {
