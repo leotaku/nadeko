@@ -52,6 +52,7 @@ int readAndLoadFile(sqlite3 *db, const char *zFilename) {
     }
 
     char buf[READ_BUFFER_SIZE];
+    memset(buf, 0, READ_BUFFER_SIZE);
     if (fread(buf, sizeof(*buf), READ_BUFFER_SIZE, fd) && ferror(fd)) {
         fprintf(stderr, "error: reading \"%s\": %s\n", zFilename, strerror(errno));
         fclose(fd);
