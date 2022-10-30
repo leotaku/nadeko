@@ -241,8 +241,10 @@ static int nadekoDisconnect(sqlite3_vtab *pVtab) {
 **    (2) Tell SQLite (via the sqlite3_declare_vtab() interface) what the
 **        result set of queries against the virtual table will look like.
 */
-static int nadekoConnect(sqlite3 *db, void *pAux, int argc, const char *const *argv,
+static int nadekoConnect(sqlite3 *db, void *pAuxUnused, int argc, const char *const *argv,
     sqlite3_vtab **ppVtab, char **pzErr) {
+    (void)(pAuxUnused);
+
     int rc;
 
     nadeko_vtab *pNew = sqlite3_malloc(sizeof(*pNew));
@@ -468,8 +470,13 @@ static int nadekoEof(sqlite3_vtab_cursor *pVtabCur) {
 ** once prior to any call to nadekoColumn() or nadekoRowid() or
 ** nadekoEof().
 */
-static int nadekoFilter(sqlite3_vtab_cursor *pVtabCur, int idxNum, const char *idxStr,
-    int argc, sqlite3_value **argv) {
+static int nadekoFilter(sqlite3_vtab_cursor *pVtabCur, int idxNumUnused,
+    const char *idxStrUnused, int argcUnused, sqlite3_value **argvUnused) {
+    (void)(idxNumUnused);
+    (void)(idxStrUnused);
+    (void)(argcUnused);
+    (void)(argvUnused);
+
     int rc = SQLITE_OK;
     nadeko_cursor *pCur = (nadeko_cursor *)pVtabCur;
     pCur->iRowid = 0;
@@ -484,7 +491,11 @@ static int nadekoFilter(sqlite3_vtab_cursor *pVtabCur, int idxNum, const char *i
 ** a query plan for each invocation and compute an estimated cost for that
 ** plan.
 */
-static int nadekoBestIndex(sqlite3_vtab *pVTab, sqlite3_index_info *pIdxInfo) {
+static int nadekoBestIndex(
+    sqlite3_vtab *pVTabUnused, sqlite3_index_info *pIdxInfoUnused) {
+    (void)(pVTabUnused);
+    (void)(pIdxInfoUnused);
+
     return SQLITE_OK;
 }
 
@@ -677,7 +688,9 @@ static sqlite3_module nadekoModule = {
 __declspec(dllexport)
 #endif
     int sqlite3_nadeko_init(
-        sqlite3 *db, char **pzErrMsg, const sqlite3_api_routines *pApi) {
+        sqlite3 *db, char **pzErrMsgUnused, const sqlite3_api_routines *pApi) {
+    (void)(pzErrMsgUnused);
+
     int rc = SQLITE_OK;
     SQLITE_EXTENSION_INIT2(pApi);
     rc = sqlite3_create_module(db, "nadeko", &nadekoModule, 0);

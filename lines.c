@@ -53,11 +53,16 @@ struct lines_cursor {
 **        result set of queries against the virtual table will look like.
 */
 static int linesConnect(sqlite3 *db,
-    void *pAux,
-    int argc,
-    const char *const *argv,
+    void *pAuxUnused,
+    int argcUnused,
+    const char *const *argvUnused,
     sqlite3_vtab **ppVtab,
-    char **pzErr) {
+    char **pzErrUnused) {
+    (void)(pAuxUnused);
+    (void)(argcUnused);
+    (void)(argvUnused);
+    (void)(pzErrUnused);
+
     lines_vtab *pNew;
 
     pNew = sqlite3_malloc(sizeof(*pNew));
@@ -83,7 +88,9 @@ static int linesDisconnect(sqlite3_vtab *pVtab) {
 /*
 ** Constructor for a new lines_cursor object.
 */
-static int linesOpen(sqlite3_vtab *pVTab, sqlite3_vtab_cursor **ppVtabCur) {
+static int linesOpen(sqlite3_vtab *pVTabUnused, sqlite3_vtab_cursor **ppVtabCur) {
+    (void)(pVTabUnused);
+
     lines_cursor *pCur = sqlite3_malloc(sizeof(lines_cursor));
     if (pCur == 0) return SQLITE_NOMEM;
     memset(pCur, 0, sizeof(*pCur));
@@ -171,10 +178,14 @@ static int linesEof(sqlite3_vtab_cursor *pVtabCur) {
 ** linesEof().
 */
 static int linesFilter(sqlite3_vtab_cursor *pVtabCur,
-    int idxNum,
-    const char *idxStr,
-    int argc,
+    int idxNumUnused,
+    const char *idxStrUnused,
+    int argcUnused,
     sqlite3_value **argv) {
+    (void)(idxNumUnused);
+    (void)(idxStrUnused);
+    (void)(argcUnused);
+
     lines_cursor *pCur = (lines_cursor *)pVtabCur;
     int rc = SQLITE_OK;
 
@@ -213,7 +224,9 @@ static int linesFilter(sqlite3_vtab_cursor *pVtabCur,
 ** a query plan for each invocation and compute an estimated cost for that
 ** plan.
 */
-static int linesBestIndex(sqlite3_vtab *pVTab, sqlite3_index_info *pIdxInfo) {
+static int linesBestIndex(sqlite3_vtab *pVTabUnused, sqlite3_index_info *pIdxInfo) {
+    (void)(pVTabUnused);
+
     const struct sqlite3_index_constraint *pConstraint = pIdxInfo->aConstraint;
     for (int i = 0; i < pIdxInfo->nConstraint; i++, pConstraint++) {
         if (pConstraint->iColumn == LINES_DATA && pConstraint->usable) {
@@ -261,7 +274,9 @@ static sqlite3_module linesModule = {
 __declspec(dllexport)
 #endif
     int sqlite3_lines_init(
-        sqlite3 *db, char **pzErrMsg, const sqlite3_api_routines *pApi) {
+        sqlite3 *db, char **pzErrMsgUnused, const sqlite3_api_routines *pApi) {
+    (void)(pzErrMsgUnused);
+
     int rc = SQLITE_OK;
     SQLITE_EXTENSION_INIT2(pApi);
     rc = sqlite3_create_module(db, "lines", &linesModule, 0);
