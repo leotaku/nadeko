@@ -241,7 +241,7 @@ static int nadekoDisconnect(sqlite3_vtab *pVtab) {
 **    (2) Tell SQLite (via the sqlite3_declare_vtab() interface) what the
 **        result set of queries against the virtual table will look like.
 */
-static int nadekoConnect(sqlite3 *db, void *, int argc, const char *const *argv,
+static int nadekoConnect(sqlite3 *db, void *_1, int argc, const char *const *argv,
     sqlite3_vtab **ppVtab, char **pzErr) {
     int rc;
 
@@ -469,7 +469,7 @@ static int nadekoEof(sqlite3_vtab_cursor *pVtabCur) {
 ** nadekoEof().
 */
 static int nadekoFilter(
-    sqlite3_vtab_cursor *pVtabCur, int, const char *, int, sqlite3_value **) {
+    sqlite3_vtab_cursor *pVtabCur, int _1, const char *_2, int _3, sqlite3_value **_4) {
     int rc = SQLITE_OK;
     nadeko_cursor *pCur = (nadeko_cursor *)pVtabCur;
     pCur->iRowid = 0;
@@ -484,7 +484,7 @@ static int nadekoFilter(
 ** a query plan for each invocation and compute an estimated cost for that
 ** plan.
 */
-static int nadekoBestIndex(sqlite3_vtab *, sqlite3_index_info *) { return SQLITE_OK; }
+static int nadekoBestIndex(sqlite3_vtab *_1, sqlite3_index_info *_2) { return SQLITE_OK; }
 
 /*
 ** SQLite will invoke this method to determine whether a certain real table
@@ -674,7 +674,7 @@ static sqlite3_module nadekoModule = {
 #ifdef _WIN32
 __declspec(dllexport)
 #endif
-    int sqlite3_nadeko_init(sqlite3 *db, char **, const sqlite3_api_routines *pApi) {
+    int sqlite3_nadeko_init(sqlite3 *db, char **_1, const sqlite3_api_routines *pApi) {
     int rc = SQLITE_OK;
     SQLITE_EXTENSION_INIT2(pApi);
     rc = sqlite3_create_module(db, "nadeko", &nadekoModule, 0);

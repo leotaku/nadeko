@@ -52,8 +52,12 @@ struct lines_cursor {
 **    (2) Tell SQLite (via the sqlite3_declare_vtab() interface) what the
 **        result set of queries against the virtual table will look like.
 */
-static int linesConnect(
-    sqlite3 *db, void *, int, const char *const *, sqlite3_vtab **ppVtab, char **) {
+static int linesConnect(sqlite3 *db,
+    void *_1,
+    int _2,
+    const char *const *_3,
+    sqlite3_vtab **ppVtab,
+    char **_4) {
     lines_vtab *pNew;
 
     pNew = sqlite3_malloc(sizeof(*pNew));
@@ -79,7 +83,7 @@ static int linesDisconnect(sqlite3_vtab *pVtab) {
 /*
 ** Constructor for a new lines_cursor object.
 */
-static int linesOpen(sqlite3_vtab *, sqlite3_vtab_cursor **ppVtabCur) {
+static int linesOpen(sqlite3_vtab *_1, sqlite3_vtab_cursor **ppVtabCur) {
     lines_cursor *pCur = sqlite3_malloc(sizeof(lines_cursor));
     if (pCur == 0) return SQLITE_NOMEM;
     memset(pCur, 0, sizeof(*pCur));
@@ -167,7 +171,7 @@ static int linesEof(sqlite3_vtab_cursor *pVtabCur) {
 ** linesEof().
 */
 static int linesFilter(
-    sqlite3_vtab_cursor *pVtabCur, int, const char *, int, sqlite3_value **argv) {
+    sqlite3_vtab_cursor *pVtabCur, int _1, const char *_2, int _3, sqlite3_value **argv) {
     lines_cursor *pCur = (lines_cursor *)pVtabCur;
     int rc = SQLITE_OK;
 
@@ -206,7 +210,7 @@ static int linesFilter(
 ** a query plan for each invocation and compute an estimated cost for that
 ** plan.
 */
-static int linesBestIndex(sqlite3_vtab *, sqlite3_index_info *pIdxInfo) {
+static int linesBestIndex(sqlite3_vtab *_1, sqlite3_index_info *pIdxInfo) {
     const struct sqlite3_index_constraint *pConstraint = pIdxInfo->aConstraint;
     for (int i = 0; i < pIdxInfo->nConstraint; i++, pConstraint++) {
         if (pConstraint->iColumn == LINES_DATA && pConstraint->usable) {
@@ -253,7 +257,7 @@ static sqlite3_module linesModule = {
 #ifdef _WIN32
 __declspec(dllexport)
 #endif
-    int sqlite3_lines_init(sqlite3 *db, char **, const sqlite3_api_routines *pApi) {
+    int sqlite3_lines_init(sqlite3 *db, char **_1, const sqlite3_api_routines *pApi) {
     int rc = SQLITE_OK;
     SQLITE_EXTENSION_INIT2(pApi);
     rc = sqlite3_create_module(db, "lines", &linesModule, 0);

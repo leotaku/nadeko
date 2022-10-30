@@ -97,11 +97,11 @@ int readAndLoadFile(sqlite3 *db, const char *zFilename) {
     }
 }
 
-void debugLogCallback(void *, int, const char *zMsg) {
+void debugLogCallback(void * _1, int _2, const char *zMsg) {
     fprintf(stderr, "debug: %s\n", zMsg);
 }
 
-int traceLogCallback(unsigned int uMask, void *, void *pData, void *pCtx) {
+int traceLogCallback(unsigned int uMask, void * _1, void *pData, void *pCtx) {
     char *zSql = 0;
     char *pNewline;
     switch (uMask) {
