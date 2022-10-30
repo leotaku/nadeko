@@ -142,6 +142,7 @@ int traceLogCallback(unsigned int uMask, void *, void *pData, void *pCtx) {
 }
 
 char *stringOptionDatabase = ":memory:";
+char *stringOptionWorkingDirectory = ".";
 int isOptionDebug = 0;
 int isOptionTrace = 0;
 int isOptionWipe = 0;
@@ -159,6 +160,13 @@ int parseCommandArgs(int argc, char *argv[]) {
         } else if (!strcmp(argv[n], "--output")) {
             if (n + 1 < argc && strncmp(argv[n + 1], "--", 2)) {
                 stringOptionDatabase = argv[++n];
+            } else {
+                fprintf(stderr, "error: missing argument to switch \"%s\"\n", argv[n]);
+                return SQLITE_ERROR;
+            }
+        } else if (!strcmp(argv[n], "--cwd")) {
+            if (n + 1 < argc && strncmp(argv[n + 1], "--", 2)) {
+                stringOptionWorkingDirectory = argv[++n];
             } else {
                 fprintf(stderr, "error: missing argument to switch \"%s\"\n", argv[n]);
                 return SQLITE_ERROR;
@@ -211,6 +219,8 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "internal: initializing extension: %s\n", sqlite3_errmsg(db));
     } else if ((rc = sqlite3_lines_init(db, &zErr, 0))) {
         fprintf(stderr, "internal: initializing extension: %s\n", sqlite3_errmsg(db));
+    } else if (chdir(stringOptionWorkingDirectory)) {
+        fprintf(stderr, "error: changing directory: %s\n", strerror(errno));
     } else {
         rc = readAndLoadFile(db, argv[1]);
     }
