@@ -3,7 +3,7 @@ project(
   version : '1.0',
   default_options : [
     # Development settings
-    'c_std=c2x',
+    'c_std=c99',
     'warning_level=3',
     'debug=true',
     'optimization=3',
