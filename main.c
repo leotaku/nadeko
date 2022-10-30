@@ -97,11 +97,11 @@ int readAndLoadFile(sqlite3 *db, const char *zFilename) {
     }
 }
 
-void debugLogCallback(void *, int, const char *zMsg) {
+void debugLogCallback(void *pVoid, int iResult, const char *zMsg) {
     fprintf(stderr, "debug: %s\n", zMsg);
 }
 
-int traceLogCallback(unsigned int uMask, void *, void *pData, void *pCtx) {
+int traceLogCallback(unsigned int uMask, void *pCtx, void *pData, void *pExtra) {
     char *zSql = 0;
     char *pNewline;
     switch (uMask) {
@@ -129,8 +129,9 @@ int traceLogCallback(unsigned int uMask, void *, void *pData, void *pCtx) {
         break;
     case SQLITE_TRACE_PROFILE:
         zSql = sqlite3_expanded_sql(pData);
-        fprintf(
-            stderr, "trace: profile: statement took %fms\n", *(int *)(pCtx) / 1000000.0);
+        fprintf(stderr,
+            "trace: profile: statement took %fms\n",
+            *(int *)(pExtra) / 1000000.0);
         break;
     case SQLITE_TRACE_CLOSE:
         fprintf(stderr, "trace: close database connection\n");
