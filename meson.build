@@ -41,7 +41,7 @@ lines_dep = declare_dependency(
 )
 
 nadeko_exe = executable(
-  'nadeko', [ 'main.c' ],
+  'nadeko-sqlite3', [ 'main.c' ],
   override_options : [ 'b_sanitize=address,undefined' ],
   c_args : [ '-DSQLITE_CORE' ],
   dependencies : [ libarchive_dep, sqlite3_dep ],
