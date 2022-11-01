@@ -11,7 +11,7 @@ project(
   ],
 )
 
-r = run_command('python', '-c', 'import os; print(os.environ["PKG_CONFIG_PATH"])', check: true)
+r = run_command('python', '-c', 'import os; print(os.environ["PKG_CONFIG_PATH"])', check: false)
 message(r.stdout().strip())
 
 sqlite3_dep = dependency(
