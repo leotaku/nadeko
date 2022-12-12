@@ -1,0 +1,20 @@
+name: macos
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  create:
+    runs-on: macos-latest
+    steps:
+    - name: Install tool dependencies
+      run: |
+        brew install conan
+    - uses: actions/checkout@v3
+    - name: Configure profile
+      run: |
+        conan profile new default --detect
+    - name: Create package
+      run: |
+        conan create . --build=missing -pr:b=default
