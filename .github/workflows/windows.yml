@@ -21,4 +21,3 @@ jobs:
         $env:Path += ';C:\Program Files\Conan\conan'
         $env:Path += ';C:\Program Files\Meson'
         conan create . --build=missing -pr:b=default
-
