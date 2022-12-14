@@ -10,14 +10,11 @@ jobs:
     steps:
     - name: Install tool dependencies
       run: |
-        choco install conan
+        python3 -m pip install conan
     - uses: actions/checkout@v3
     - name: Configure profile
       run: |
-        $env:Path += ';C:\Program Files\Conan\conan'
         conan profile new default --detect
     - name: Create package
       run: |
-        $env:Path += ';C:\Program Files\Conan\conan'
-        $env:Path += ';C:\Program Files\Meson'
         conan create . --build=missing -pr:b=default

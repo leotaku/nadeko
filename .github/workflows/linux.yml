@@ -10,7 +10,7 @@ jobs:
     steps:
     - name: Install tool dependencies
       run: |
-        pip install conan
+        python3 -m pip install conan
     - uses: actions/checkout@v3
     - name: Configure profile
       run: |
