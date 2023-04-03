@@ -18,7 +18,7 @@ jobs:
     - uses: actions/checkout@v3
     - name: Configure profile
       run: |
-        conan profile new default --detect
+        conan profile detect --name=default --force
     - name: Create package
       run: |
         conan create . --build=missing -pr:b=default
