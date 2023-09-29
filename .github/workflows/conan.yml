@@ -15,7 +15,7 @@ jobs:
     - name: Install tool dependencies
       run: |
         python3 -m pip install conan
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Configure profile
       run: |
         conan profile detect --name=default --force
