@@ -10,3 +10,7 @@
 meson build
 ninja -C build
 ```
+
+## License
+
+[MIT](./LICENSE) © 2022-2026 Leo Gaskin
