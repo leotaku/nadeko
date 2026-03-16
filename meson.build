@@ -23,12 +23,14 @@ libarchive_dep = dependency(
 nadeko_lib = both_libraries(
   'nadeko', [ 'nadeko.c' ],
   dependencies : [ libarchive_dep, sqlite3_dep ],
+  name_prefix : 'lib',
   pic : true,
   install : true,
 )
 lines_lib = both_libraries(
   'lines', [ 'lines.c' ],
   dependencies : [ sqlite3_dep ],
+  name_prefix : 'lib',
   pic : true,
   install : true,
 )
