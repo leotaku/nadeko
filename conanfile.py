@@ -10,8 +10,8 @@ class NadekoConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     generators = "PkgConfigDeps", "MesonToolchain"
     exports_sources = "meson.build", "*.c"
-    requires = "sqlite3/3.39.4", "libarchive/3.6.1"
-    tool_requires = "meson/0.63.3", "ninja/1.11.1", "pkgconf/1.9.3"
+    requires = "sqlite3/3.51.0", "libarchive/3.8.1"
+    tool_requires = "meson/1.10.1", "ninja/1.13.2", "pkgconf/2.5.1"
 
     def layout(self):
         basic_layout(self)
